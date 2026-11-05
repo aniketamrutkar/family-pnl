@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Family P&L</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1d2330;--mute:#667085;--line:#d9dde3;--acc:#2f6fed;--bad:#c0392b}
+@media (prefers-color-scheme: dark){:root{--bg:#14171c;--card:#1d2129;--ink:#e6e8eb;--mute:#9aa3af;--line:#353b45;--acc:#6b9bff;--bad:#ff7b6b}}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);
+  font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:16px;box-sizing:border-box}
+form{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;width:100%;max-width:340px}
+h1{font-size:18px;margin:0 0 16px}
+input[type=password]{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:8px;
+  background:var(--bg);color:var(--ink);font-size:15px;margin-bottom:12px}
+button{width:100%;padding:10px;border:0;border-radius:8px;background:var(--acc);color:#fff;font-size:15px;cursor:pointer}
+button:disabled{opacity:.6}
+p{margin:10px 0 0;font-size:13px;color:var(--mute)}
+#msg{min-height:20px;color:var(--bad)}
+form[hidden]{display:none}
+</style>
+</head>
+<body>
+<form id="f" hidden>
+  <h1>Family P&L</h1>
+  <input type="password" id="pw" placeholder="Password" autocomplete="current-password" autofocus required>
+  <button id="go">Open</button>
+  <p id="msg"></p>
+  <p>Stays unlocked on this device, for all of these sites.</p>
+</form>
+<script>
+{
+const BAKED = '/family-pnl/', SALT = 'flat-finder/site/v1', ROUNDS = 600000, CHECK = 'yKl/ai8oAkuiH00G7eocwgzvxV1HuzaLkGGcGZsSc/FLA2GIrK3xLU8lxZeZmhNiZ7tsT29DsN9/O2MYpqwYpg==';
+const SHARED = 'flatfinder-sitekey', DB = 'site-lock', STORE = 'keys', ID = 'v1', LAST = 'site-lock-reload';
+// The site's path as this URL spells it (GitHub Pages ignores case in the repo name)
+const ROOT = location.pathname.slice(0, BAKED.length).toLowerCase() === BAKED.toLowerCase() ? location.pathname.slice(0, BAKED.length) : BAKED;
+const enc = new TextEncoder(), $ = id => document.getElementById(id);
+const hex = b => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+const unhex = h => Uint8Array.from(h.match(/../g), x => parseInt(x, 16));
+
+function idb(mode, op) {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open(DB, 1);
+    open.onupgradeneeded = () => open.result.createObjectStore(STORE);
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const tx = open.result.transaction(STORE, mode), req = op(tx.objectStore(STORE));
+      tx.oncomplete = () => resolve(req.result);
+      tx.onerror = () => reject(tx.error);
+    };
+  });
+}
+
+async function valid(h) {
+  if (!/^[0-9a-f]{128}$/.test(h || '')) return false;
+  const raw = Uint8Array.from(atob(CHECK), c => c.charCodeAt(0));
+  const mac = await crypto.subtle.importKey('raw', unhex(h).slice(32), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+  return crypto.subtle.verify('HMAC', mac, raw.slice(0, 32), raw.slice(32));
+}
+
+async function derive(password) {
+  const base = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+  return hex(new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(SALT), iterations: ROUNDS }, base, 512)));
+}
+
+// Saves the key, starts the decrypting service worker and reloads this URL through it.
+async function enter(h) {
+  await idb('readwrite', s => s.put(h, ID));
+  try { localStorage.setItem(SHARED, h); } catch (e) {}
+  const reg = await navigator.serviceWorker.register(ROOT + 'sw.js', { scope: ROOT });
+  await navigator.serviceWorker.ready;
+  (reg.active || navigator.serviceWorker.controller)?.postMessage('reload-keys');
+  let last = 0;
+  const mark = LAST + ':' + location.pathname;  // per page: all the sites share this origin's storage
+  try { last = +sessionStorage.getItem(mark) || 0; sessionStorage.setItem(mark, Date.now()); } catch (e) {}
+  if (Date.now() - last < 15000) {  // we already reloaded and still landed here
+    $('f').hidden = false;
+    $('msg').innerHTML = `Unlocked, but this page was not found. <a href="${ROOT}">Open the home page</a>.`;
+    return;
+  }
+  location.reload();
+}
+
+$('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('go').disabled = true; $('msg').textContent = 'Checking…';
+  try {
+    const h = await derive($('pw').value);
+    if (await valid(h)) { $('msg').textContent = ''; await enter(h); }
+    else { $('msg').textContent = 'Wrong password.'; $('pw').select(); }
+  } catch (err) { $('msg').textContent = 'Could not open: ' + err.message; }
+  $('go').disabled = false;
+});
+
+(async () => {
+  if (!('serviceWorker' in navigator) || !window.indexedDB || !crypto.subtle) {
+    $('f').hidden = false;
+    $('msg').textContent = 'This browser cannot open the site here (a private window may block it).';
+    $('go').disabled = true;
+    return;
+  }
+  let h = await idb('readonly', s => s.get(ID)).catch(() => null);
+  if (!await valid(h)) { try { h = localStorage.getItem(SHARED); } catch (e) { h = null; } }
+  if (await valid(h)) await enter(h).catch(err => { $('f').hidden = false; $('msg').textContent = err.message; });
+  else $('f').hidden = false;
+})();
+}
+</script>
+</body>
+</html>
