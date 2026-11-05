@@ -74,6 +74,13 @@ header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px s
 .chip[aria-pressed="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
 .chip.sub{min-height:32px;font-size:13px;padding:4px 12px}
 .chip.sub[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+/* nested tabs: person (Anup | DD) → holder (All · PEW · JPW) → broker (All · Zerodha · Angel One) */
+.ptabs{display:flex;gap:4px;max-width:1180px;margin:0 auto;padding:2px 16px 0;border-bottom:1px solid var(--border)}
+.ptabs button{flex:none;border:0;background:none;padding:8px 18px 10px;font:inherit;font-size:16px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1px}
+.ptabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+#holders{padding-top:10px}
+#brokers .chip{min-height:30px;font-size:12.5px;padding:3px 12px}
+.chips .lvl{flex:none;align-self:center;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;min-width:52px}
 .chips .sep{flex:none;width:1px;background:var(--border-strong);margin:4px 2px}
 
 /* ---------- nav ---------- */
@@ -173,6 +180,7 @@ details[open] .chev{transform:rotate(90deg)}
 .tt .pc{display:inline-block;min-width:46px;margin-left:6px;font-size:11.5px;font-weight:500;color:var(--muted)}
 .tt .held{font-size:12px;color:var(--text-2)}
 .tt .d0{display:none}
+.tt .tp{display:none}
 .acct-foot{display:flex;justify-content:space-between;padding:10px 16px 12px;border-top:1px solid var(--border);font-size:13px;color:var(--text-2)}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
 .empty b{display:block;color:var(--text-2);font-size:15px;margin-bottom:4px}
@@ -249,6 +257,11 @@ details.sell[open] .lots{animation:viewIn .15s ease-out}
   .chips{gap:6px;padding:3px 14px 7px}
   .chip{min-height:30px;padding:4px 13px;font-size:13px}
   .chip.sub{min-height:26px;padding:2px 10px;font-size:12px}
+  .ptabs{padding:0 10px}
+  .ptabs button{font-size:14.5px;padding:6px 14px 8px}
+  #holders{padding-top:8px}
+  #brokers .chip{min-height:26px;font-size:11.5px;padding:2px 10px}
+  .chips .lvl{font-size:9.5px;min-width:44px}
   .share-note{padding:0 14px 8px;font-size:11.5px}
   .share{font-size:10px;line-height:15px;padding:0 5px}
   nav.tabs button{font-size:10.5px;gap:2px}
@@ -296,7 +309,8 @@ details.sell[open] .lots{animation:viewIn .15s ease-out}
   .tt .held{font-size:10.5px}
   .tt .d2,.tt .pc{display:none}
   .tt .d0{display:inline}
-  .tt .held{display:none}
+  .tt .held,.tt .termc{display:none}
+  .tt .tp{display:inline}
   .tt td.sym{max-width:74px;overflow:hidden;text-overflow:ellipsis}
   .tt th{letter-spacing:0}
   .tt th{padding:3px 4px} .tt td{padding:6px 4px}
@@ -384,8 +398,9 @@ html.embedded .phone-btn{display:none!important}
     <button class="icon-btn phone-btn" id="phoneBtn" title="Phone view" aria-label="Show phone view">
       <svg viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></button>
   </div>
-  <div class="chips" id="people" role="group" aria-label="Person"></div>
-  <div class="chips" id="accts" role="group" aria-label="Account" hidden></div>
+  <div class="ptabs" id="people" role="tablist" aria-label="Person"></div>
+  <div class="chips" id="holders" role="tablist" aria-label="Account holder"></div>
+  <div class="chips" id="brokers" role="tablist" aria-label="Broker"></div>
   <div class="share-note" id="shareNote" hidden></div>
   <nav class="tabs" id="tabs" aria-label="Views">
     <button data-tab="day"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg>Day</button>
@@ -461,16 +476,26 @@ const VIEWS = D.views || D.people.map(p => ({ id: p.id, name: p.name,
 const VIEW = Object.fromEntries(VIEWS.map(v => [v.id, v]));
 const S = {
   tab: ['day', 'cal', 'tax', 'hold'].includes(location.hash.slice(1)) ? location.hash.slice(1) : store.get('tab', 'day'),
-  view: new URLSearchParams(location.search).get('view') || store.get('view', null), account: store.get('account', 'ALL'),
+  view: new URLSearchParams(location.search).get('view') || store.get('view', null), holder: store.get('holder', 'ALL'), broker: store.get('broker', 'ALL'),
   date: (q => /^\d{4}-\d{2}-\d{2}$/.test(q || '') ? q : D.asOf)(new URLSearchParams(location.search).get('date')), month: D.asOf.slice(0, 7), fy: fyOf(D.asOf), holdSort: store.get('holdSort', 'pnl'),
 };
 if (!VIEW[S.view]) S.view = VIEWS[0].id;
-if (S.account !== 'ALL' && !(S.account in VIEW[S.view].shares)) S.account = 'ALL';
+// top tabs are the partners (Anup, DD); PEW / JPW are reached through the holder tabs (or a ?view= link)
+const TOP = VIEWS.filter(v => !D.people.some(p => p.id === v.id));
+if (!TOP.some(v => v.id === S.view) && !new URLSearchParams(location.search).get('view')) S.view = TOP[0].id;   // an old saved PEW/JPW choice
+const viewAccs = () => D.accounts.map(a => a.id).filter(id => VIEW[S.view].shares[id] > 0);
+const holdersOf = () => [...new Set(viewAccs().map(id => ACC[id].person))];
+const BROKERS = ['Zerodha', 'Angel One'];
+function fixFilters() {
+  if (S.holder !== 'ALL' && !holdersOf().includes(S.holder)) S.holder = 'ALL';
+  if (holdersOf().length === 1) S.holder = holdersOf()[0];
+  if (S.broker !== 'ALL' && !BROKERS.includes(S.broker)) S.broker = 'ALL';
+}
+fixFilters();
 
 const shareOf = acc => VIEW[S.view].shares[acc] || 0;
 function selAccounts() {
-  if (S.account !== 'ALL') return [S.account];
-  return D.accounts.map(a => a.id).filter(id => shareOf(id) > 0);
+  return viewAccs().filter(id => (S.holder === 'ALL' || ACC[id].person === S.holder) && (S.broker === 'ALL' || ACC[id].broker === S.broker));
 }
 // Records and holdings scaled by the view's share of each account. Quantities are scaled, so every amount derived
 // from them (values, gains) is the share too; `oq` keeps the real traded quantity for display.
@@ -483,7 +508,7 @@ function scaleRec(r, k) {
 }
 let cacheKey = '', cache;
 function V() {
-  const key = S.view + '|' + S.account;
+  const key = S.view + '|' + S.holder + '|' + S.broker;
   if (key !== cacheKey) {
     const set = new Set(selAccounts());
     const records = D.records.filter(r => set.has(r.account)).map(r => scaleRec(r, shareOf(r.account)));
@@ -517,28 +542,32 @@ const termPills = lots => ['IN', 'ST', 'LT', 'NA'].filter(t => lots.some(l => l.
 // ---------- header: filters ----------
 function renderFilters() {
   const v = VIEW[S.view];
-  $('#people').innerHTML = VIEWS.map(x => `<button class="chip" data-view="${x.id}" aria-pressed="${S.view === x.id}">${esc(x.name)}</button>`).join('');
-  const ids = D.accounts.map(a => a.id).filter(id => v.shares[id] > 0);
-  const oneHolder = new Set(ids.map(id => ACC[id].person)).size === 1;
-  $('#accts').hidden = ids.length < 2;
-  $('#accts').innerHTML = [`<button class="chip sub" data-account="ALL" aria-pressed="${S.account === 'ALL'}">All accounts</button>`,
-    ...ids.map(id => `<button class="chip sub" data-account="${id}" aria-pressed="${S.account === id}">${esc(oneHolder ? ACC[id].broker : ACC[id].label)}</button>`)].join('');
+  $('#people').innerHTML = TOP.map(x => `<button role="tab" data-view="${x.id}" aria-selected="${S.view === x.id}">${esc(x.name)}</button>`).join('');
+  const hs = holdersOf();
+  $('#holders').innerHTML = `<span class="lvl">Account</span>` + [...(hs.length > 1 ? [['ALL', 'All']] : []), ...hs.map(p => [p, PERSON[p].name])]
+    .map(([id, name]) => `<button class="chip" role="tab" data-holder="${id}" aria-pressed="${S.holder === id}">${esc(name)}${id !== 'ALL' && v.shares[viewAccs().find(a => ACC[a].person === id)] < 1 ? ` <span class="share">${pctTxt(v.shares[viewAccs().find(a => ACC[a].person === id)])}</span>` : ''}</button>`).join('');
+  $('#brokers').innerHTML = `<span class="lvl">Broker</span>` + [['ALL', 'All'], ...BROKERS.map(b => [b, b])]
+    .map(([id, name]) => `<button class="chip sub" role="tab" data-broker="${id}" aria-pressed="${S.broker === id}">${esc(name)}</button>`).join('');
   // "Anup's share: 50% of PEW" / "DD's share: 100% of JPW + 50% of PEW"
   const byHolder = {};
-  for (const id of ids) byHolder[ACC[id].person] = v.shares[id];
+  for (const id of selAccounts()) byHolder[ACC[id].person] = v.shares[id];
   const partial = Object.values(byHolder).some(k => k < 1);
   $('#shareNote').hidden = !partial;
   if (partial) $('#shareNote').innerHTML = `${esc(v.name)}'s share: ` + Object.entries(byHolder).sort((a, b) => b[1] - a[1])
     .map(([p, k]) => `<b>${pctTxt(k)} of ${esc(PERSON[p].name)}</b>`).join(' + ') + '. All amounts below are this share.';
 }
+const saveFilters = () => { store.set('view', S.view); store.set('holder', S.holder); store.set('broker', S.broker); };
 $('#people').addEventListener('click', e => {
   const b = e.target.closest('[data-view]'); if (!b) return;
-  S.view = b.dataset.view; S.account = 'ALL';
-  store.set('view', S.view); store.set('account', S.account); render();
+  S.view = b.dataset.view; S.holder = 'ALL'; fixFilters(); saveFilters(); render();
 });
-$('#accts').addEventListener('click', e => {
-  const b = e.target.closest('[data-account]'); if (!b) return;
-  S.account = b.dataset.account; store.set('account', S.account); render();
+$('#holders').addEventListener('click', e => {
+  const b = e.target.closest('[data-holder]'); if (!b) return;
+  S.holder = b.dataset.holder; saveFilters(); render();
+});
+$('#brokers').addEventListener('click', e => {
+  const b = e.target.closest('[data-broker]'); if (!b) return;
+  S.broker = b.dataset.broker; saveFilters(); render();
 });
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('[data-tab]'); if (!b) return;
@@ -597,6 +626,7 @@ const heldTxt = (from, to) => {
 };
 const BROKER_ORDER = ['Zerodha', 'Angel One'];
 const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const plTxt = n => `<span class="d2">${signed(n)}</span><span class="d0">${signed(n).replace('₹', '')}</span>`;   // phones drop the ₹ inside tables
 const dShort = d => `${+d.slice(8)} ${MON3[+d.slice(5, 7) - 1]} ${d.slice(2, 4)}`;   // 16 Sep 24
 // prices: full on laptop (₹1,300.00), compact on phones (1,300; small prices keep paise: 12.74)
 const nfc = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
@@ -623,19 +653,19 @@ function brokerBlock(a, r) {
   let h = `<div class="bk"><div class="bk-head"><span>${esc(a.broker)}</span>${r ? `<span class="num ${cls(r.net)}">${signed(r.net)}</span>` : '<span class="muted">No trades</span>'}</div>`;
   if (!r) return h + '</div>';
   if (r.sells.length) {
-    h += `<div class="tw"><table class="tt"><thead><tr><th>Sold</th><th>Qty</th><th>Sell</th><th>Buy</th><th>Bought on</th><th>Term</th><th>P&amp;L</th></tr></thead><tbody>`;
+    h += `<div class="tw"><table class="tt"><thead><tr><th>Sold</th><th>Qty</th><th>Sell</th><th>Buy</th><th>Bought on</th><th class="termc">Term</th><th>P&amp;L</th></tr></thead><tbody>`;
     for (const s of r.sells) {
       const lots = [...s.lots].sort((x, y) => (x.t === 'IN') - (y.t === 'IN') || (x.d || '9').localeCompare(y.d || '9'));
       lots.forEach((l, i) => {
         const g = l.p == null ? null : (s.p - l.p) * l.q;
         h += `<tr class="${i === 0 ? 'first' : 'more'}"><td class="sym">${i === 0 ? esc(s.s) : ''}</td><td class="num">${qty(l)}</td>
           <td class="num">${px2(s.p)}</td><td class="num">${l.p == null ? '—' : px2(l.p)}</td>
-          <td class="num">${l.p == null ? 'no record' : l.t === 'IN' ? 'same day' : dShort(l.d)}</td>
-          <td><span class="pill ${l.t}">${TERM[l.t]}</span>${l.p != null && l.t !== 'IN' ? ` <span class="held">${heldTxt(l.d, r.date)}</span>` : ''}</td>
-          <td class="num pl ${g == null ? '' : cls(g)}">${g == null ? '—' : signed(g)}${g == null ? '' : `<span class="pc">${pct(g, l.p * l.q)}</span>`}</td></tr>`;
+          <td class="num">${l.p == null ? 'no record' : l.t === 'IN' ? 'same day' : dShort(l.d)}<span class="tp"> <span class="pill ${l.t}">${{ IN: 'IN', ST: 'ST', LT: 'LT', NA: '?' }[l.t]}</span></span></td>
+          <td class="termc"><span class="pill ${l.t}">${TERM[l.t]}</span>${l.p != null && l.t !== 'IN' ? ` <span class="held">${heldTxt(l.d, r.date)}</span>` : ''}</td>
+          <td class="num pl ${g == null ? '' : cls(g)}">${g == null ? '—' : plTxt(g)}${g == null ? '' : `<span class="pc">${pct(g, l.p * l.q)}</span>`}</td></tr>`;
       });
-      if (lots.length > 1) h += `<tr class="tot"><td class="sym"><span class="d2">${esc(s.s)} total</span><span class="d0">Total</span></td><td class="num">${qty(s)}</td><td></td><td></td><td></td><td></td>
-        <td class="num pl ${cls(s.gross)}">${signed(s.gross)}<span class="pc">${pct(s.gross, s.cost)}</span></td></tr>`;
+      if (lots.length > 1) h += `<tr class="tot"><td class="sym"><span class="d2">${esc(s.s)} total</span><span class="d0">Total</span></td><td class="num">${qty(s)}</td><td></td><td></td><td></td><td class="termc"></td>
+        <td class="num pl ${cls(s.gross)}">${plTxt(s.gross)}<span class="pc">${pct(s.gross, s.cost)}</span></td></tr>`;
     }
     h += `</tbody></table></div>`;
   }
@@ -855,9 +885,9 @@ function phoneView(on) {
   if (on) { $('#pvIframe').src = location.pathname + '#' + S.tab; return; }
   $('#pvIframe').src = 'about:blank';
   // pick up the filter and tab chosen inside the phone view
-  const v = store.get('view', S.view), a = store.get('account', 'ALL'), t = store.get('tab', S.tab);
+  const v = store.get('view', S.view), t = store.get('tab', S.tab);
   if (VIEW[v]) S.view = v;
-  S.account = a === 'ALL' || a in VIEW[S.view].shares ? a : 'ALL';
+  S.holder = store.get('holder', 'ALL'); S.broker = store.get('broker', 'ALL'); fixFilters();
   if (['day', 'cal', 'tax', 'hold'].includes(t)) { S.tab = t; history.replaceState(null, '', '#' + t); }
   render();
 }
@@ -888,21 +918,21 @@ if (location.hash === '#selftest') {
   for (const t of ['day', 'cal', 'tax', 'hold']) {
     try { S.tab = t; render(); ok($('#v-' + t).innerHTML.length > 200, 'view renders: ' + t); } catch (e) { ok(false, 'view ' + t + ': ' + e.message); }
   }
-  S.view = 'PEW'; S.account = 'PEW-ANGEL'; S.tab = 'day'; render();
-  ok(recsOn(D.asOf).every(r => r.account === 'PEW-ANGEL'), 'account filter limits records');
-  const netOf = v => { S.view = v; S.account = 'ALL'; return sum(V().records, r => r.net); };
+  S.view = 'DD'; S.holder = 'PEW'; S.broker = 'Angel One'; S.tab = 'day'; render();
+  ok(selAccounts().join() === 'PEW-ANGEL' && V().records.every(r => r.account === 'PEW-ANGEL'), 'holder + broker tabs limit records');
+  const netOf = v => { S.view = v; S.holder = 'ALL'; S.broker = 'ALL'; fixFilters(); return sum(V().records, r => r.net); };
   const pew = netOf('PEW'), jpw = netOf('JPW');
   ok(Math.abs(netOf('ANUP') - pew / 2) < 1, 'Anup = 50% of PEW');
   ok(Math.abs(netOf('DD') - (jpw + pew / 2)) < 1, 'DD = 100% of JPW + 50% of PEW');
   ok(Math.abs(netOf('ANUP') + netOf('DD') - (pew + jpw)) < 1, 'Anup + DD = PEW + JPW');
-  try { for (const v of ['ANUP', 'DD']) for (const t of ['day', 'cal', 'tax', 'hold']) { S.view = v; S.account = 'ALL'; S.tab = t; render(); } ok(true, 'Anup and DD views render'); }
+  try { for (const v of ['ANUP', 'DD']) for (const hb of [['ALL', 'ALL'], ['PEW', 'Zerodha'], ['JPW', 'Angel One']]) for (const t of ['day', 'cal', 'tax', 'hold']) { S.view = v; [S.holder, S.broker] = hb; fixFilters(); S.tab = t; render(); } ok(true, 'Anup and DD views render'); }
   catch (e) { ok(false, 'share views: ' + e.message); }
   ok(Math.abs(sum(D.accounts.map(a => a.id), id => sum(D.records.filter(r => r.account === id), r => r.net)) - sum(D.records, r => r.net)) < 1, 'per-account totals add up to the family total');
   ok(compact(125000) === '+1.25L' && compact(-4500) === MINUS + '4.5k' && compact(12500000) === '+1.25Cr', 'compact INR format');
   ok(document.documentElement.scrollWidth <= window.innerWidth + 1, 'no horizontal page scroll at ' + window.innerWidth + 'px');
   phoneView(true); ok(!$('#phoneView').hidden && $('#pvIframe').getAttribute('src').endsWith('#' + S.tab), 'phone view opens the page in a frame');
   phoneView(false); ok($('#phoneView').hidden, 'phone view closes'); store.set('phone', false);
-  S.view = VIEWS[0].id; S.account = 'ALL';
+  S.view = TOP[0].id; S.holder = 'ALL'; S.broker = 'ALL'; fixFilters();
   for (const v of ['day', 'cal', 'tax', 'hold']) $('#v-' + v).hidden = true;
   const st = $('#selftest'); st.hidden = false; st.textContent = out.join('\n');
 }
