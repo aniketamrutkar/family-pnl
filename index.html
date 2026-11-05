@@ -207,6 +207,14 @@ details[open] .chev{transform:rotate(90deg)}
 .lt .d0{display:none}
 .lt .ph{display:none}
 .tt .tp{display:none}
+.lt.log .bs{font-weight:700;font-size:10.5px;letter-spacing:.04em}
+.lt.log .bs.B{color:var(--in)} .lt.log .bs.S{color:var(--lt)}
+.lt.log tr.nd td{border-top:1px solid var(--border-strong)}
+.lt.log tr:not(.nd) td{border-top:1px dashed var(--border)}
+.lt.log .ph-only{display:none}
+.lt.log th:nth-child(2),.lt.log td.sym{text-align:left}
+.lt.log th:nth-child(3),.lt.log td:nth-child(3){text-align:center}
+.log-fy{height:36px;border:1px solid var(--border-strong);border-radius:10px;padding:0 10px;font:inherit;font-size:13px;background:var(--surface);color:var(--text)}
 /* ---------- stock lens ---------- */
 .lens-tools{display:flex;gap:8px;align-items:center;margin:14px 0 10px;flex-wrap:wrap}
 .lens-tools input{flex:1;min-width:140px;height:36px;border:1px solid var(--border-strong);border-radius:10px;padding:0 12px;font:inherit;font-size:14px;background:var(--surface);color:var(--text)}
@@ -386,6 +394,9 @@ details.sell[open] .lots{animation:viewIn .15s ease-out}
   .ev{margin:0 12px;font-size:11.5px}
   .ev div{grid-template-columns:62px 36px 1fr auto;gap:6px}
   .lens-tools input{height:32px;font-size:13px}
+  .lt.log .ph-only{display:block}
+  .log-fy{height:32px;font-size:12px}
+  nav.tabs button{font-size:9.5px}
   .chev{width:14px;height:14px}
   .lots{margin:0 14px 9px;padding:2px 10px;border-radius:8px}
   .lot{font-size:11.5px;padding:6px 0;gap:8px}
@@ -478,6 +489,7 @@ html.embedded .phone-btn{display:none!important}
     <button data-tab="tax"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Tax</button>
     <button data-tab="hold"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4z"/><path d="M9 7V4h6v3"/></svg>Holdings</button>
     <button data-tab="lens"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/><path d="M8.5 12.5l2-2 1.5 1.5 2.5-3"/></svg>Stock Lens</button>
+    <button data-tab="log"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>Trade Log</button>
   </nav>
 </header>
 
@@ -489,6 +501,7 @@ html.embedded .phone-btn{display:none!important}
   <section class="view" id="v-tax" hidden></section>
   <section class="view" id="v-hold" hidden></section>
   <section class="view" id="v-lens" hidden></section>
+  <section class="view" id="v-log" hidden></section>
   <section class="view card" id="selftest" hidden></section>
 </main>
 
@@ -549,9 +562,9 @@ const VIEWS = D.views || D.people.map(p => ({ id: p.id, name: p.name,
   shares: Object.fromEntries(D.accounts.filter(a => a.person === p.id).map(a => [a.id, 1])) }));
 const VIEW = Object.fromEntries(VIEWS.map(v => [v.id, v]));
 const S = {
-  tab: ['day', 'cal', 'tax', 'hold', 'lens'].includes(location.hash.slice(1)) ? location.hash.slice(1) : store.get('tab', 'day'),
+  tab: ['day', 'cal', 'tax', 'hold', 'lens', 'log'].includes(location.hash.slice(1)) ? location.hash.slice(1) : store.get('tab', 'day'),
   view: new URLSearchParams(location.search).get('view') || store.get('view', null), holder: store.get('holder', 'ALL'), broker: store.get('broker', 'ALL'),
-  lensSort: store.get('lensSort', 'pnl'), lensQ: '', lensOpen: null,
+  lensSort: store.get('lensSort', 'pnl'), lensQ: '', lensOpen: null, logQ: '', logSide: 'ALL', logFy: 'ALL', logN: 200,
   date: (q => /^\d{4}-\d{2}-\d{2}$/.test(q || '') ? q : D.asOf)(new URLSearchParams(location.search).get('date')), month: D.asOf.slice(0, 7), fy: fyOf(D.asOf), holdSort: store.get('holdSort', 'pnl'),
 };
 if (!VIEW[S.view]) S.view = VIEWS[0].id;
@@ -846,6 +859,60 @@ function bindLens() {
   document.querySelectorAll('#v-lens tr.row-s').forEach(tr => tr.onclick = () => { S.lensOpen = S.lensOpen === tr.dataset.sym ? null : tr.dataset.sym; renderLens(); });
 }
 
+
+// ---------- Trade Log: every buy and sale available for the selected person / account / broker, newest first ----------
+// One line per stock per day and side (fills of the same day are combined at their average price).
+function logRows() {
+  const multi = new Set(selAccounts()).size > 1, out = [];
+  for (const r of V().records) {
+    for (const b of r.buys) out.push({ d: r.date, acc: r.account, k: 'B', s: b.s, q: qty(b), p: b.p, v: qty(b) * b.p });
+    for (const x of r.sells) out.push({ d: r.date, acc: r.account, k: 'S', s: x.s, q: qty(x), p: x.p, v: qty(x) * x.p, g: x.gross,
+      t: ['IN', 'ST', 'LT', 'NA'].filter(t => x.lots.some(l => l.t === t)) });
+  }
+  out.sort((a, b) => b.d.localeCompare(a.d) || (a.k === b.k ? a.s.localeCompare(b.s) : a.k === 'S' ? -1 : 1));
+  return { rows: out, multi };
+}
+function renderLog() {
+  const { rows: all, multi } = logRows();
+  const fys = [...new Set(all.map(x => String(fyOf(x.d))))].sort().reverse();
+  if (S.logFy !== 'ALL' && !fys.includes(S.logFy)) S.logFy = 'ALL';
+  const q = S.logQ.trim().toUpperCase();
+  const rows = all.filter(x => (S.logSide === 'ALL' || x.k === S.logSide) && (S.logFy === 'ALL' || String(fyOf(x.d)) === S.logFy) && (!q || x.s.includes(q)));
+  const nb = rows.filter(x => x.k === 'B'), ns = rows.filter(x => x.k === 'S');
+  const real = sum(ns, x => x.g);
+  let h = `<div class="card"><div class="hero"><div class="label">Trades${S.logFy !== 'ALL' ? ' in ' + fyLabel(+S.logFy) : ', all time'}${q ? ' · ' + esc(S.logQ) : ''}</div>
+      <div class="big num">${rows.length.toLocaleString('en-IN')}</div><div class="sub">${nb.length} buys · ${ns.length} sales · realised ${signed(real)} (your share, before charges)</div></div>
+    <div class="stats"><div class="stat"><div class="k">Bought (value)</div><div class="v num">${rs(sum(nb, x => x.v))}</div></div>
+      <div class="stat"><div class="k">Sold (value)</div><div class="v num">${rs(sum(ns, x => x.v))}</div></div>
+      <div class="stat"><div class="k">Realised P&amp;L</div><div class="v num ${cls(real)}">${signed(real)}</div></div>
+      <div class="stat"><div class="k">Days traded</div><div class="v num">${new Set(rows.map(x => x.d)).size}</div></div></div></div>
+    <div class="lens-tools"><input id="logQ" type="search" placeholder="Search a stock…" value="${esc(S.logQ)}" aria-label="Search a stock">
+      <div class="seg" role="group" aria-label="Buy or sell">${[['ALL', 'All'], ['B', 'Buys'], ['S', 'Sales']].map(([k, n]) => `<button data-lside="${k}" aria-pressed="${S.logSide === k}">${n}</button>`).join('')}</div>
+      <select id="logFy" class="log-fy" aria-label="Financial year"><option value="ALL">All years</option>${fys.map(f => `<option value="${f}" ${S.logFy === f ? 'selected' : ''}>${fyLabel(+f)}</option>`).join('')}</select></div>`;
+  if (!rows.length) { $('#v-log').innerHTML = h + `<div class="card empty"><b>No trades</b>Nothing matches these filters.</div>`; bindLog(); return; }
+  const shown = rows.slice(0, S.logN);
+  h += `<div class="card"><div class="tw"><table class="lt log"><thead><tr><th>Date</th><th>Stock</th><th>B/S</th><th>Qty</th><th>Price</th><th class="lp">Value</th><th>P&amp;L</th>${multi ? '<th class="lp">Account</th>' : ''}</tr></thead><tbody>`;
+  let last = '';
+  for (const x of shown) {
+    const newDay = x.d !== last; last = x.d;
+    h += `<tr class="${newDay ? 'nd' : ''}"><td class="num">${newDay ? dShort(x.d) : ''}</td><td class="sym">${esc(x.s)}${multi ? `<span class="sub ph-only">${esc(ACC[x.acc].label)}</span>` : ''}</td>
+      <td><span class="bs ${x.k}">${x.k === 'B' ? 'BUY' : 'SELL'}</span></td><td class="num">${x.q}</td><td class="num">${px2(x.p)}</td><td class="num lp">${rs(x.v)}</td>
+      <td class="num pl ${x.k === 'S' ? cls(x.g) : ''}">${x.k === 'S' ? plTxt(x.g) + `<span class="sub">${x.t.map(t => ({ IN: 'Intraday', ST: 'ST', LT: 'LT', NA: 'cost ?' }[t])).join(' + ')}</span>` : ''}</td>
+      ${multi ? `<td class="lp">${esc(ACC[x.acc].label)}</td>` : ''}</tr>`;
+  }
+  h += `</tbody></table></div>${rows.length > shown.length ? `<div style="text-align:center;padding:10px"><button class="link-btn" id="logMore">Show ${Math.min(200, rows.length - shown.length)} more (${rows.length - shown.length} left)</button></div>` : ''}</div>
+    <p class="note">One line per stock per day and side: several fills on the same day are combined at their average price. P&amp;L is your share of the sale's gain before charges. Buys of days covered only by a broker's tax report show the shares that were later sold.</p>`;
+  $('#v-log').innerHTML = h;
+  bindLog();
+}
+function bindLog() {
+  const qi = $('#logQ');
+  if (qi) qi.oninput = e => { S.logQ = e.target.value; S.logN = 200; const pos = e.target.selectionStart; renderLog(); const n = $('#logQ'); n.focus(); n.setSelectionRange(pos, pos); };
+  document.querySelectorAll('[data-lside]').forEach(b => b.onclick = () => { S.logSide = b.dataset.lside; S.logN = 200; renderLog(); });
+  const fy = $('#logFy'); if (fy) fy.onchange = e => { S.logFy = e.target.value; S.logN = 200; renderLog(); };
+  const more = $('#logMore'); if (more) more.onclick = () => { S.logN += 200; renderLog(); };
+}
+
 // ---------- Calendar ----------
 function dayNets() {
   const m = {};
@@ -1038,8 +1105,8 @@ function render() {
   document.querySelectorAll('#tabs [data-tab]').forEach(b => {
     if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  for (const t of ['day', 'cal', 'tax', 'hold', 'lens']) $('#v-' + t).hidden = t !== S.tab;
-  ({ day: renderDay, cal: renderCal, tax: renderTax, hold: renderHold, lens: renderLens })[S.tab]();
+  for (const t of ['day', 'cal', 'tax', 'hold', 'lens', 'log']) $('#v-' + t).hidden = t !== S.tab;
+  ({ day: renderDay, cal: renderCal, tax: renderTax, hold: renderHold, lens: renderLens, log: renderLog })[S.tab]();
 }
 
 // ---------- data status: is the data fresh, did the last run work, does anything need a look ----------
@@ -1128,7 +1195,7 @@ function phoneView(on) {
   const v = store.get('view', S.view), t = store.get('tab', S.tab);
   if (VIEW[v]) S.view = v;
   S.holder = store.get('holder', 'ALL'); S.broker = store.get('broker', 'ALL'); fixFilters();
-  if (['day', 'cal', 'tax', 'hold', 'lens'].includes(t)) { S.tab = t; history.replaceState(null, '', '#' + t); }
+  if (['day', 'cal', 'tax', 'hold', 'lens', 'log'].includes(t)) { S.tab = t; history.replaceState(null, '', '#' + t); }
   render();
 }
 $('#phoneBtn').onclick = () => phoneView(true);
@@ -1155,7 +1222,7 @@ if (location.hash === '#selftest') {
   ok(D.records.every(r => r.sells.every(s => s.lots.every(l => l.t !== 'LT' || daysBetween(r.date, ltDate(l.d)) <= 1))), 'long-term lots were held 12 months or more');
   ok(D.records.every(r => r.sells.every(s => s.lots.every(l => l.t !== 'ST' || r.date < ltDate(l.d)))), 'short-term lots were held 12 months or less');
   ok(D.records.every(r => r.sells.every(s => s.lots.every(l => (l.t === 'NA') === (l.p == null)))), 'unknown-cost lots are marked NA');
-  for (const t of ['day', 'cal', 'tax', 'hold', 'lens']) {
+  for (const t of ['day', 'cal', 'tax', 'hold', 'lens', 'log']) {
     try { S.tab = t; render(); ok($('#v-' + t).innerHTML.length > 200, 'view renders: ' + t); } catch (e) { ok(false, 'view ' + t + ': ' + e.message); }
   }
   S.view = 'DD'; S.holder = 'PEW'; S.broker = 'Angel One'; S.tab = 'day'; render();
@@ -1165,17 +1232,19 @@ if (location.hash === '#selftest') {
   ok(Math.abs(netOf('ANUP') - pew / 2) < 1, 'Anup = 50% of PEW');
   ok(Math.abs(netOf('DD') - (jpw + pew / 2)) < 1, 'DD = 100% of JPW + 50% of PEW');
   ok(Math.abs(netOf('ANUP') + netOf('DD') - (pew + jpw)) < 1, 'Anup + DD = PEW + JPW');
-  try { for (const v of ['ANUP', 'DD']) for (const hb of [['ALL', 'ALL'], ['PEW', 'Zerodha'], ['JPW', 'Angel One']]) for (const t of ['day', 'cal', 'tax', 'hold', 'lens']) { S.view = v; [S.holder, S.broker] = hb; fixFilters(); S.tab = t; render(); } ok(true, 'Anup and DD views render'); }
+  try { for (const v of ['ANUP', 'DD']) for (const hb of [['ALL', 'ALL'], ['PEW', 'Zerodha'], ['JPW', 'Angel One']]) for (const t of ['day', 'cal', 'tax', 'hold', 'lens', 'log']) { S.view = v; [S.holder, S.broker] = hb; fixFilters(); S.tab = t; render(); } ok(true, 'Anup and DD views render'); }
   catch (e) { ok(false, 'share views: ' + e.message); }
   S.view = 'DD'; S.holder = 'ALL'; S.broker = 'ALL'; fixFilters(); S.tab = 'lens'; render();
   ok($('#v-lens').innerHTML.length > 200 && Math.abs(sum(lensData(), x => x.realised) - sum(V().records, r => r.gross)) < 1, 'Stock Lens renders and its total = sum of day gross');
+  S.tab = 'log'; render();
+  ok(logRows().rows.length === sum(V().records, r => r.buys.length + r.sells.length) && $('#v-log').innerHTML.length > 200, 'Trade Log lists every buy and sale');
   ok(Math.abs(sum(D.accounts.map(a => a.id), id => sum(D.records.filter(r => r.account === id), r => r.net)) - sum(D.records, r => r.net)) < 1, 'per-account totals add up to the family total');
   ok(compact(125000) === '+1.25L' && compact(-4500) === MINUS + '4.5k' && compact(12500000) === '+1.25Cr', 'compact INR format');
   ok(document.documentElement.scrollWidth <= window.innerWidth + 1, 'no horizontal page scroll at ' + window.innerWidth + 'px');
   phoneView(true); ok(!$('#phoneView').hidden && $('#pvIframe').getAttribute('src').endsWith('#' + S.tab), 'phone view opens the page in a frame');
   phoneView(false); ok($('#phoneView').hidden, 'phone view closes'); store.set('phone', false);
   S.view = TOP[0].id; S.holder = 'ALL'; S.broker = 'ALL'; fixFilters();
-  for (const v of ['day', 'cal', 'tax', 'hold', 'lens']) $('#v-' + v).hidden = true;
+  for (const v of ['day', 'cal', 'tax', 'hold', 'lens', 'log']) $('#v-' + v).hidden = true;
   const st = $('#selftest'); st.hidden = false; st.textContent = out.join('\n');
 }
 </script>
