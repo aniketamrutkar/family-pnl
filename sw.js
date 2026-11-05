@@ -68,9 +68,10 @@ async function serve(request, url) {
   if (!k) return fetch(request);
   let rel = decodeURIComponent(url.pathname.slice(ROOT.length));
   if (rel === '' || rel.endsWith('/')) rel += 'index.html';
-  let res = await fetch(ROOT + '_enc/' + await nameOf(k, rel));
+  // no-cache: always revalidate with GitHub Pages (ETag), so a newly published page shows at once instead of after its 10-minute cache
+  let res = await fetch(ROOT + '_enc/' + await nameOf(k, rel), { cache: 'no-cache' });
   if (res.status === 404 && !/\.[^./]+$/.test(rel)) {  // a folder without its trailing slash
-    const idx = await fetch(ROOT + '_enc/' + await nameOf(k, rel + '/index.html'), { method: 'HEAD' });
+    const idx = await fetch(ROOT + '_enc/' + await nameOf(k, rel + '/index.html'), { method: 'HEAD', cache: 'no-cache' });
     if (idx.ok) return Response.redirect(url.origin + url.pathname + '/' + url.search, 301);
   }
   if (!res.ok) return new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
