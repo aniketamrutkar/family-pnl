@@ -564,7 +564,7 @@ const VIEW = Object.fromEntries(VIEWS.map(v => [v.id, v]));
 const S = {
   tab: ['day', 'cal', 'tax', 'hold', 'lens', 'log'].includes(location.hash.slice(1)) ? location.hash.slice(1) : store.get('tab', 'day'),
   view: new URLSearchParams(location.search).get('view') || store.get('view', null), holder: store.get('holder', 'ALL'), broker: store.get('broker', 'ALL'),
-  lensSort: store.get('lensSort', 'pnl'), lensQ: '', lensOpen: null, logQ: '', logSide: 'ALL', logFy: 'ALL', logN: 200,
+  lensSort: store.get('lensSort', 'pnl'), lensQ: '', lensOpen: null, lensFy: 'ALL', lensMon: 'ALL', logQ: '', logSide: 'ALL', logFy: 'ALL', logN: 200,
   date: (q => /^\d{4}-\d{2}-\d{2}$/.test(q || '') ? q : D.asOf)(new URLSearchParams(location.search).get('date')), month: D.asOf.slice(0, 7), fy: fyOf(D.asOf), holdSort: store.get('holdSort', 'pnl'),
 };
 if (!VIEW[S.view]) S.view = VIEWS[0].id;
@@ -786,22 +786,25 @@ function brokerBlock(a, r) {
 // from the buy records plus the buy lots of sales and holdings (so buys from before the trade history count too).
 function lensData() {
   const by = {};
+  // period filter (FY and/or month) applies to buys and sales; held shares and open P&L are always as of today
+  const inP = d => (S.lensFy === 'ALL' || String(fyOf(d)) === S.lensFy) && (S.lensMon === 'ALL' || d.slice(0, 7) === S.lensMon);
   const S0 = sym => (by[sym] = by[sym] || { s: sym, realised: 0, cost: 0, sold: 0, bought: 0, buys: [], sells: [], seen: new Set(), held: 0, open: 0, openCost: 0, accounts: new Set() });
   const multi = new Set(selAccounts()).size > 1;
   const tag = acc => multi ? ACC[acc].label : '';
   for (const r of V().records) {
+    if (!inP(r.date)) continue;
     for (const b of r.buys) { const x = S0(b.s); x.buys.push({ d: r.date, q: qty(b), p: b.p, acc: tag(r.account) }); x.seen.add(r.account + r.date + b.p); x.bought += qty(b); x.accounts.add(r.account); }
     for (const sl of r.sells) {
       const x = S0(sl.s); x.realised += sl.gross; x.cost += sl.cost || 0; x.sold += qty(sl); x.accounts.add(r.account);
       x.sells.push({ d: r.date, q: qty(sl), p: sl.p, g: sl.gross, acc: tag(r.account) });
-      for (const l of sl.lots) if (l.p != null && l.d && !x.seen.has(r.account + l.d + l.p)) { x.seen.add(r.account + l.d + l.p); x.buys.push({ d: l.d, q: qty(l), p: l.p, acc: tag(r.account), lot: true }); }
+      for (const l of sl.lots) if (l.p != null && l.d && inP(l.d) && !x.seen.has(r.account + l.d + l.p)) { x.seen.add(r.account + l.d + l.p); x.buys.push({ d: l.d, q: qty(l), p: l.p, acc: tag(r.account), lot: true }); }
     }
   }
   for (const h of V().holdings) {
     const x = S0(h.s); x.accounts.add(h.account);
     for (const l of h.lots) {
       x.held += qty(l); x.open += (h.ltp - l.p) * l.q; x.openCost += l.p * l.q;
-      if (!x.seen.has(h.account + l.d + l.p)) { x.seen.add(h.account + l.d + l.p); x.buys.push({ d: l.d, q: qty(l), p: l.p, acc: tag(h.account), lot: true }); }
+      if (inP(l.d) && !x.seen.has(h.account + l.d + l.p)) { x.seen.add(h.account + l.d + l.p); x.buys.push({ d: l.d, q: qty(l), p: l.p, acc: tag(h.account), lot: true }); }
     }
   }
   const ext = (arr, f) => arr.length ? arr.reduce((m, e) => f(e.p, m.p) ? e : m) : null;
@@ -811,7 +814,14 @@ function lensData() {
   });
 }
 function renderLens() {
-  const all = lensData();
+  const dates = V().records.map(r => r.date);
+  const fys = [...new Set(dates.map(d => String(fyOf(d))))].sort().reverse();
+  if (S.lensFy !== 'ALL' && !fys.includes(S.lensFy)) S.lensFy = 'ALL';
+  const mons = [...new Set(dates.filter(d => S.lensFy === 'ALL' || String(fyOf(d)) === S.lensFy).map(d => d.slice(0, 7)))].sort().reverse();
+  if (S.lensMon !== 'ALL' && !mons.includes(S.lensMon)) S.lensMon = 'ALL';
+  const monName = m => `${MON3[+m.slice(5) - 1]} ${m.slice(0, 4)}`;
+  const period = S.lensMon !== 'ALL' ? monName(S.lensMon) : S.lensFy !== 'ALL' ? fyLabel(+S.lensFy) : 'all time';
+  const all = lensData().filter(x => x.buys.length || x.sells.length || (S.lensFy === 'ALL' && S.lensMon === 'ALL'));
   const q = S.lensQ.trim().toUpperCase();
   const rows = all.filter(x => !q || x.s.includes(q));
   const sorters = { pnl: (a, b) => b.realised - a.realised, loss: (a, b) => a.realised - b.realised, name: (a, b) => a.s.localeCompare(b.s),
@@ -821,14 +831,16 @@ function renderLens() {
   const best = [...all].sort((a, b) => b.realised - a.realised)[0], worst = [...all].sort((a, b) => a.realised - b.realised)[0];
   const px = e => e ? `${px2(e.p)}<span class="sub">${dShort(e.d)}</span>` : '<span class="muted">—</span>';
   const rng = (lo, hi) => lo ? `${px2(lo.p)}<span class="sub">${px2(hi.p)}</span>` : '<span class="muted">—</span>';   // phones: low over high
-  let h = `<div class="card"><div class="hero"><div class="label">Realised P&amp;L across all stocks, all time (before charges)</div>
+  let h = `<div class="card"><div class="hero"><div class="label">Realised P&amp;L across all stocks, ${period} (before charges)</div>
       <div class="big num ${cls(total)}">${signed(total)}</div>
       <div class="sub">${all.length} stocks · ${won.length} in profit · ${lost.length} in loss</div></div>
     <div class="stats"><div class="stat"><div class="k">Best stock</div><div class="v num ${best ? cls(best.realised) : ''}">${best ? esc(best.s) + ' ' + signed(best.realised) : '—'}</div></div>
       <div class="stat"><div class="k">Worst stock</div><div class="v num ${worst ? cls(worst.realised) : ''}">${worst ? esc(worst.s) + ' ' + signed(worst.realised) : '—'}</div></div>
       <div class="stat"><div class="k">Open P&amp;L on held shares</div><div class="v num ${cls(sum(all, x => x.open))}">${signed(sum(all, x => x.open))}</div></div>
       <div class="stat"><div class="k">Trades</div><div class="v num">${sum(all, x => x.buys.length)} buys · ${sum(all, x => x.sells.length)} sales</div></div></div></div>
-    <div class="lens-tools"><input id="lensQ" type="search" placeholder="Search a stock…" value="${esc(S.lensQ)}" aria-label="Search a stock">
+    <div class="lens-tools"><select id="lensFy" class="log-fy" aria-label="Financial year"><option value="ALL">All years</option>${fys.map(f => `<option value="${f}" ${S.lensFy === f ? 'selected' : ''}>${fyLabel(+f)}</option>`).join('')}</select>
+      <select id="lensMon" class="log-fy" aria-label="Month"><option value="ALL">All months</option>${mons.map(m => `<option value="${m}" ${S.lensMon === m ? 'selected' : ''}>${monName(m)}</option>`).join('')}</select></div>
+    <div class="lens-tools" style="margin-top:0"><input id="lensQ" type="search" placeholder="Search a stock…" value="${esc(S.lensQ)}" aria-label="Search a stock">
       <div class="seg" role="group" aria-label="Sort">${[['pnl', 'Profit'], ['loss', 'Loss'], ['open', 'Open'], ['trades', 'Trades'], ['name', 'A–Z']]
         .map(([k, n]) => `<button data-lsort="${k}" aria-pressed="${S.lensSort === k}">${n}</button>`).join('')}</div></div>`;
   if (!rows.length) { $('#v-lens').innerHTML = h + `<div class="card empty"><b>No stocks</b>${q ? 'Nothing matches “' + esc(S.lensQ) + '”.' : 'No trades for this selection.'}</div>`; bindLens(); return; }
@@ -848,13 +860,15 @@ function renderLens() {
         <span class="r num ${e.k === 'S' ? cls(e.g) : ''}">${e.k === 'S' ? signed(e.g) : ''}</span></div>`).join('')}</div></td></tr>`;
     }
   }
-  h += `</tbody></table></div></div><p class="note">Realised P&amp;L is your share of each sale's gain before charges (charges are billed per day, not per stock). Buy prices include buys from before the trade history (from the sold and held lots); bonus shares at ₹0 are left out of "Buy low". Tap a stock for every buy and sale.</p>`;
+  h += `</tbody></table></div></div><p class="note">Realised P&amp;L is your share of each sale's gain before charges (charges are billed per day, not per stock). Buy prices include buys from before the trade history (from the sold and held lots); bonus shares at ₹0 are left out of "Buy low". The year and month filters apply to buys and sales; held shares and open P&amp;L are always as of today. Tap a stock for every buy and sale.</p>`;
   $('#v-lens').innerHTML = h;
   bindLens();
 }
 function bindLens() {
   const qi = $('#lensQ');
   if (qi) qi.oninput = e => { S.lensQ = e.target.value; const pos = e.target.selectionStart; renderLens(); const n = $('#lensQ'); n.focus(); n.setSelectionRange(pos, pos); };
+  const fy = $('#lensFy'); if (fy) fy.onchange = e => { S.lensFy = e.target.value; S.lensMon = 'ALL'; renderLens(); };
+  const mo = $('#lensMon'); if (mo) mo.onchange = e => { S.lensMon = e.target.value; renderLens(); };
   document.querySelectorAll('[data-lsort]').forEach(b => b.onclick = () => { S.lensSort = b.dataset.lsort; store.set('lensSort', S.lensSort); renderLens(); });
   document.querySelectorAll('#v-lens tr.row-s').forEach(tr => tr.onclick = () => { S.lensOpen = S.lensOpen === tr.dataset.sym ? null : tr.dataset.sym; renderLens(); });
 }
@@ -1235,6 +1249,7 @@ if (location.hash === '#selftest') {
   try { for (const v of ['ANUP', 'DD']) for (const hb of [['ALL', 'ALL'], ['PEW', 'Zerodha'], ['JPW', 'Angel One']]) for (const t of ['day', 'cal', 'tax', 'hold', 'lens', 'log']) { S.view = v; [S.holder, S.broker] = hb; fixFilters(); S.tab = t; render(); } ok(true, 'Anup and DD views render'); }
   catch (e) { ok(false, 'share views: ' + e.message); }
   S.view = 'DD'; S.holder = 'ALL'; S.broker = 'ALL'; fixFilters(); S.tab = 'lens'; render();
+  S.lensFy = 'ALL'; S.lensMon = 'ALL';
   ok($('#v-lens').innerHTML.length > 200 && Math.abs(sum(lensData(), x => x.realised) - sum(V().records, r => r.gross)) < 1, 'Stock Lens renders and its total = sum of day gross');
   S.tab = 'log'; render();
   ok(logRows().rows.length === sum(V().records, r => r.buys.length + r.sells.length) && $('#v-log').innerHTML.length > 200, 'Trade Log lists every buy and sale');
