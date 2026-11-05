@@ -147,6 +147,20 @@ details[open] .chev{transform:rotate(90deg)}
 .pill{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:6px;line-height:16px}
 .pill.NA{background:var(--warn-bg);color:var(--warn-text)}
 .pill.LT{background:var(--lt-soft);color:var(--lt)} .pill.ST{background:var(--st-soft);color:var(--st)} .pill.IN{background:var(--in-soft);color:var(--in)}
+.st{padding:2px 16px 8px}
+.st-h,.st-r{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,.95fr);gap:10px;align-items:start}
+.st-h{font-size:11px;color:var(--muted);font-weight:600;padding:2px 0 6px;border-bottom:1px solid var(--border)}
+.st-h span:last-child,.st-r .c4{text-align:right}
+.st-r{padding:8px 0;font-size:14px}
+.st-r + .st-r.first,.st-t + .st-r{border-top:1px dashed var(--border)}
+.st-r > div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.st-r .sym{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-r .sub,.st-t .sub{font-size:12px;color:var(--text-2)}
+.st-r .c4 span:first-child{font-weight:650}
+.st-r:not(.first){padding-top:2px}
+.st-t{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-2);padding:2px 0 8px;font-weight:600}
+.muted{color:var(--muted)}
+.badge[hidden]{display:none}
 .acct-foot{display:flex;justify-content:space-between;padding:10px 16px 12px;border-top:1px solid var(--border);font-size:13px;color:var(--text-2)}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
 .empty b{display:block;color:var(--text-2);font-size:15px;margin-bottom:4px}
@@ -254,6 +268,14 @@ details.sell[open] .lots{animation:viewIn .15s ease-out}
   .row .meta{font-size:11.5px}
   .row .r .v{font-size:13.5px}
   .row .r .p{font-size:10.5px}
+  .st{padding:0 14px 6px}
+  .st-h,.st-r{gap:6px}
+  .st-h{font-size:9.5px;padding:1px 0 4px}
+  .st-r{padding:6px 0;font-size:12.5px}
+  .st-r .sym{font-size:13px}
+  .st-r .sub,.st-t .sub{font-size:10.5px}
+  .st-r .pill{font-size:9px;padding:0 4px;line-height:14px}
+  .st-t{font-size:11px;padding:1px 0 6px}
   .chev{width:14px;height:14px}
   .lots{margin:0 14px 9px;padding:2px 10px;border-radius:8px}
   .lot{font-size:11.5px;padding:6px 0;gap:8px}
@@ -412,8 +434,8 @@ const VIEWS = D.views || D.people.map(p => ({ id: p.id, name: p.name,
 const VIEW = Object.fromEntries(VIEWS.map(v => [v.id, v]));
 const S = {
   tab: ['day', 'cal', 'tax', 'hold'].includes(location.hash.slice(1)) ? location.hash.slice(1) : store.get('tab', 'day'),
-  view: store.get('view', null), account: store.get('account', 'ALL'),
-  date: D.asOf, month: D.asOf.slice(0, 7), fy: fyOf(D.asOf), holdSort: store.get('holdSort', 'pnl'),
+  view: new URLSearchParams(location.search).get('view') || store.get('view', null), account: store.get('account', 'ALL'),
+  date: (q => /^\d{4}-\d{2}-\d{2}$/.test(q || '') ? q : D.asOf)(new URLSearchParams(location.search).get('date')), month: D.asOf.slice(0, 7), fy: fyOf(D.asOf), holdSort: store.get('holdSort', 'pnl'),
 };
 if (!VIEW[S.view]) S.view = VIEWS[0].id;
 if (S.account !== 'ALL' && !(S.account in VIEW[S.view].shares)) S.account = 'ALL';
@@ -545,23 +567,39 @@ function renderDay() {
   $('#dPick').onchange = e => { if (e.target.value) { S.date = e.target.value; render(); } };
   const latest = $('#dLatest'); if (latest) latest.onclick = () => { S.date = D.asOf; render(); };
 }
+// Sold stocks as one always-open table: a line per buy lot, so sell vs buy price, buy date and holding time show at once.
+const heldTxt = (from, to) => {
+  const d = daysBetween(from, to);
+  if (d < 60) return d + 'd';
+  const m = Math.round(d / 30.44);
+  return m < 12 ? m + 'm' : Math.floor(m / 12) + 'y' + (m % 12 ? ' ' + (m % 12) + 'm' : '');
+};
+function sellTable(r) {
+  let h = `<div class="st"><div class="st-h"><span>Scrip · qty</span><span>Sold · bought</span><span>Bought on · held</span><span>P&amp;L</span></div>`;
+  for (const s of r.sells) {
+    const multi = s.lots.length > 1;
+    [...s.lots].sort((a, b) => (a.t === 'IN') - (b.t === 'IN') || (a.d || '9').localeCompare(b.d || '9')).forEach((l, i) => {
+      const first = i === 0;
+      const g = l.p == null ? null : (s.p - l.p) * l.q;
+      h += `<div class="st-r${first ? ' first' : ''}">
+        <div class="c1">${first ? `<span class="sym">${esc(s.s)}</span>` : ''}<span class="sub num">${qty(l)}${multi ? ` of ${qty(s)}` : ''}</span></div>
+        <div class="c2 num"><span>${rsP(s.p)}</span><span class="sub">${l.p == null ? 'no buy record' : rsP(l.p)}</span></div>
+        <div class="c3 num"><span>${l.p == null ? '—' : l.t === 'IN' ? 'Same day' : fmtShort(l.d)}</span>
+          <span class="sub"><span class="pill ${l.t}">${{ IN: 'INTRADAY', ST: 'ST', LT: 'LT', NA: 'COST ?' }[l.t]}</span>${l.p != null && l.t !== 'IN' ? ' ' + heldTxt(l.d, r.date) : ''}</span></div>
+        <div class="c4 num">${g == null ? '<span class="muted">—</span>' : `<span class="${cls(g)}">${signed(g)}</span><span class="sub">${pct(g, l.p * l.q)}</span>`}</div>
+      </div>`;
+    });
+    if (multi) h += `<div class="st-t"><span>${esc(s.s)} total</span><span class="num ${cls(s.gross)}">${signed(s.gross)} <span class="sub">${pct(s.gross, s.cost)}</span></span></div>`;
+  }
+  return h + `</div>`;
+}
 function acctCard(r) {
   const a = ACC[r.account];
   let h = `<div class="card"><div class="acct-head"><div><div class="name">${esc(PERSON[a.person].name)}</div><div class="broker">${esc(a.broker)}${shareOf(r.account) < 1 ? `<span class="share">${pctTxt(shareOf(r.account))} share</span>` : ''}</div></div>
     <div class="net num ${cls(r.net)}">${signed(r.net)}</div></div>`;
   if (r.sells.length) {
     h += `<div class="sec-label">Sold</div>`;
-    for (const s of r.sells) {
-      h += `<details class="sell"><summary><div class="row">${ICON.chev}
-        <div class="l"><div class="sym">${esc(s.s)} ${termPills(s.lots)}</div><div class="meta num">${qty(s)} @ ${rsP(s.p)}</div></div>
-        <div class="r"><div class="v num ${cls(s.gross)}">${signed(s.gross)}</div><div class="p num">${pct(s.gross, s.cost)}</div></div></div></summary>
-        <div class="lots">${s.lots.map(l => {
-          if (l.p == null) return `<div class="lot"><div class="l num">${qty(l)} with no buy record</div><span class="pill NA">COST ?</span><div class="r muted">—</div></div>`;
-          const g = (s.p - l.p) * l.q;
-          return `<div class="lot"><div class="l num">${qty(l)} bought ${l.t === 'IN' ? 'same day' : fmtShort(l.d)} @ ${rsP(l.p)}</div>
-            <span class="pill ${l.t}">${l.t === 'IN' ? 'INTRADAY' : l.t}</span><div class="r num ${cls(g)}">${signed(g)}</div></div>`;
-        }).join('')}</div></details>`;
-    }
+    h += sellTable(r);
   }
   if (r.buys.length) {
     h += `<div class="sec-label">Bought</div>`;
@@ -806,7 +844,8 @@ if (location.hash === '#selftest') {
   ok(lotQty, 'every sell quantity equals the sum of its FIFO lots');
   ok(gross, 'every sell gross equals the sum of its lot gains');
   ok(net, 'every day: gross − charges = net');
-  ok(D.records.every(r => r.sells.every(s => s.lots.every(l => l.t !== 'LT' || r.date >= ltDate(l.d)))), 'long-term lots were held more than 12 months');
+  // Angel's reports already count a sale on the 1-year anniversary as long-term, so allow one day's difference
+  ok(D.records.every(r => r.sells.every(s => s.lots.every(l => l.t !== 'LT' || daysBetween(r.date, ltDate(l.d)) <= 1))), 'long-term lots were held 12 months or more');
   ok(D.records.every(r => r.sells.every(s => s.lots.every(l => l.t !== 'ST' || r.date < ltDate(l.d)))), 'short-term lots were held 12 months or less');
   ok(D.records.every(r => r.sells.every(s => s.lots.every(l => (l.t === 'NA') === (l.p == null)))), 'unknown-cost lots are marked NA');
   for (const t of ['day', 'cal', 'tax', 'hold']) {
