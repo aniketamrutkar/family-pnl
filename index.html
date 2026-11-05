@@ -88,6 +88,23 @@ header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px s
 .mini-date .md-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .mini-date .md-day{font-weight:650;font-size:14px;min-width:150px;text-align:center}
 .mini-date .md-net{font-size:13px;font-weight:650}
+/* ---------- data status ---------- */
+.status-pill{margin-left:auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border-strong);background:var(--surface);border-radius:999px;padding:5px 11px;font:inherit;font-size:12px;color:var(--text-2);cursor:pointer;line-height:1.2;text-align:left}
+.status-pill b{color:var(--text);font-weight:600}
+.status-pill .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--gain)}
+.status-pill.warn .dot{background:#d99a00} .status-pill.error .dot{background:var(--loss)}
+.status-pill.warn{border-color:var(--warn-border)} .status-pill.error{border-color:var(--err-border)}
+#statusBar .alert{margin:0 0 12px;cursor:pointer}
+#statusBar .alert ul{margin:4px 0 0;padding-left:18px}
+.status-panel{margin:0 0 12px;padding:4px 0}
+.status-panel h3{font-size:13px;margin:10px 16px 4px;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.status-panel table{width:100%;border-collapse:collapse;font-size:13px}
+.status-panel th,.status-panel td{text-align:left;padding:6px 16px;border-top:1px solid var(--border);white-space:nowrap}
+.status-panel th{font-size:11px;color:var(--muted);font-weight:600}
+.status-panel .tw{overflow-x:auto}
+.status-panel .ok{color:var(--gain);font-weight:600} .status-panel .bad{color:var(--loss);font-weight:600} .status-panel .old{color:var(--warn-text);font-weight:600}
+.status-panel ul{margin:4px 16px 10px;padding-left:18px;font-size:13px;color:var(--text-2)}
+.status-panel li{margin:3px 0}
 .chips .sep{flex:none;width:1px;background:var(--border-strong);margin:4px 2px}
 
 /* ---------- nav ---------- */
@@ -269,6 +286,10 @@ details.sell[open] .lots{animation:viewIn .15s ease-out}
   #holders{padding-top:8px}
   #brokers .chip{min-height:26px;font-size:11.5px;padding:2px 10px}
   .chips .lvl{font-size:9.5px;min-width:44px}
+  .status-pill{font-size:10.5px;padding:4px 9px;gap:5px}
+  .status-panel table{font-size:11.5px}
+  .status-panel th,.status-panel td{padding:5px 12px}
+  .status-panel ul{font-size:12px;margin:4px 12px 8px}
   .mini-date{padding:5px 14px}
   .mini-date .md-day{font-size:13px;min-width:130px}
   .mini-date .md-net{font-size:12px}
@@ -404,7 +425,7 @@ html.embedded .phone-btn{display:none!important}
 <header>
   <div class="head-row">
     <div class="brand">Family P&amp;L<span class="badge" id="sampleBadge" hidden>Sample data</span></div>
-    <div class="asof" id="asof"></div>
+    <button class="status-pill" id="statusPill" type="button" aria-controls="statusPanel" aria-expanded="false"></button>
     <button class="icon-btn phone-btn" id="phoneBtn" title="Phone view" aria-label="Show phone view">
       <svg viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></button>
   </div>
@@ -422,6 +443,8 @@ html.embedded .phone-btn{display:none!important}
 </header>
 
 <main>
+  <div id="statusBar"></div>
+  <div class="card status-panel" id="statusPanel" hidden></div>
   <section class="view" id="v-day"></section>
   <section class="view" id="v-cal" hidden></section>
   <section class="view" id="v-tax" hidden></section>
@@ -898,7 +921,77 @@ function render() {
   for (const t of ['day', 'cal', 'tax', 'hold']) $('#v-' + t).hidden = t !== S.tab;
   ({ day: renderDay, cal: renderCal, tax: renderTax, hold: renderHold })[S.tab]();
 }
-$('#asof').innerHTML = `Data to<br><b class="t2">${fmtShort(D.asOf)}</b>`;
+
+// ---------- data status: is the data fresh, did the last run work, does anything need a look ----------
+// The job runs at 8:30 PM IST Mon–Fri and 8:00 AM IST Tue–Sat. GitHub can start late, so allow 75 minutes.
+const IST = 5.5 * 3600e3, GRACE = 75 * 60e3;
+function lastExpectedRun(now = Date.now()) {
+  for (let back = 0; back < 8; back++) {
+    const d = new Date(now + IST - back * 86400e3), dow = d.getUTCDay();
+    const day = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - IST;   // 00:00 IST of that day
+    const slots = [];
+    if (dow >= 1 && dow <= 5) slots.push(day + 20.5 * 3600e3);    // evening
+    if (dow >= 2 && dow <= 6) slots.push(day + 8 * 3600e3);       // morning
+    for (const t of slots.sort((a, b) => b - a)) if (t + GRACE <= now) return t;
+  }
+  return 0;
+}
+const fmtWhen = iso => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+const accLabel = id => id ? (ACC[id] ? ACC[id].label : id) : 'All accounts';
+function dataStatus() {
+  const st = D.status || {}, run = st.lastRun;
+  const gen = Date.parse(D.generatedAt || 0), expected = lastExpectedRun();
+  const stale = !D.sample && expected && gen < expected - 10 * 60e3;
+  const runErrors = run && !run.ok ? run.errors || [] : [];
+  const issues = (st.issues || []).filter(w => !runErrors.some(e => e.text && w.text && w.text.includes(e.text)));
+  const level = runErrors.length || issues.some(w => w.level === 'error') ? 'error' : stale || issues.length ? 'warn' : 'ok';
+  return { st, run, gen, expected, stale, runErrors, issues, level };
+}
+function renderStatus() {
+  const x = dataStatus();
+  const pill = $('#statusPill');
+  pill.className = 'status-pill ' + x.level;
+  pill.innerHTML = `<span class="dot"></span><span>${x.level === 'ok' ? 'Updated' : x.level === 'error' ? 'Problem ·' : x.stale ? 'Not updated ·' : 'Check ·'}<br><b>${D.generatedAt ? fmtWhen(D.generatedAt) : fmtShort(D.asOf)}</b></span>`;
+  pill.title = 'Data status: tap for details';
+  const lines = [];
+  if (x.stale) lines.push(`<li><b>Data not updated since ${fmtWhen(D.generatedAt)}.</b> The run due at ${fmtWhen(new Date(x.expected).toISOString())} hasn't published — the daily job may have failed or not run.</li>`);
+  for (const e of x.runErrors) lines.push(`<li><b>${esc(accLabel(e.account))}:</b> ${esc(e.text)} <span class="muted">(${x.run.mode} run, ${fmtWhen(x.run.at)})</span></li>`);
+  const errs = x.issues.filter(w => w.level === 'error'), warns = x.issues.filter(w => w.level !== 'error');
+  for (const w of errs) lines.push(`<li><b>${esc(accLabel(w.account))}:</b> ${esc(w.text)}</li>`);
+  if (warns.length) lines.push(`<li>${warns.length} check${warns.length > 1 ? 's' : ''} need${warns.length > 1 ? '' : 's'} a look (holdings or buy records) — tap for the list.</li>`);
+  $('#statusBar').innerHTML = x.level === 'ok' ? '' : `<div class="alert ${x.level}" role="${x.level === 'error' ? 'alert' : 'status'}">${ICON.warn}
+    <div><b>${x.level === 'error' ? 'Something went wrong with the data' : x.stale ? 'The data is out of date' : 'Some checks need a look'}</b><ul>${lines.join('')}</ul></div></div>`;
+  const bar = $('#statusBar .alert'); if (bar) bar.onclick = () => togglePanel(true);
+  if (!$('#statusPanel').hidden) renderPanel(x);
+}
+function renderPanel(x = dataStatus()) {
+  const day = d => d ? fmtShort(d) : '—';
+  const latestDay = D.asOf;
+  const fresh = (x.st.accounts || []).map(a => {
+    const lastIn = [a.lastApi, a.lastNote, a.lastTrade].filter(Boolean).sort().pop();
+    return `<tr><td>${esc(accLabel(a.account))}</td><td>${day(a.lastApi)}</td><td>${day(a.lastNote)}</td><td>${day(a.lastTrade)}</td><td>${day(a.holdingsAsOf)}</td>
+      <td>${ACC[a.account] && ACC[a.account].broker === 'Angel One' && a.lastApi && a.lastApi < latestDay ? '<span class="old">API behind</span>' : '<span class="ok">OK</span>'}</td></tr>`;
+  }).join('');
+  const runs = [...(x.st.runs || [])].reverse().slice(0, 8).map(r => `<tr><td>${fmtWhen(r.at)}</td><td>${r.mode}</td><td>${r.ok ? '<span class="ok">OK</span>' : '<span class="bad">' + (r.errors || []).length + ' error' + ((r.errors || []).length === 1 ? '' : 's') + '</span>'}</td>
+    <td>${r.fetched ? Object.entries(r.fetched).map(([k, v]) => `${esc(accLabel(k).replace(' · Angel', ''))}: ${v.ok ? v.trades + ' fills' : 'failed'}`).join(', ') : '—'}</td>
+    <td>${r.notes ? `${r.notes.read} notes${r.notes.added ? ', ' + r.notes.added + ' new trades' : ''}${r.notes.filled && r.notes.filled.length ? ', filled ' + r.notes.filled.map(f => f.date).join(' ') : ''}` : '—'}</td></tr>`).join('');
+  const issues = x.issues.map(w => `<li><b>${esc(accLabel(w.account))}</b> (${fmtShort(w.date)}): ${esc(w.text)}</li>`).join('');
+  $('#statusPanel').innerHTML = `
+    <h3>Data</h3><ul><li>Page data built <b>${D.generatedAt ? fmtWhen(D.generatedAt) : '—'}</b>, covering trades up to <b>${fmtShort(D.asOf)}</b>.</li>
+      ${x.expected ? `<li>Last scheduled run due ${fmtWhen(new Date(x.expected).toISOString())}: ${x.stale ? '<span class="bad">missing</span>' : '<span class="ok">done</span>'}.</li>` : ''}</ul>
+    <h3>Accounts</h3><div class="tw"><table><thead><tr><th>Account</th><th>Broker API</th><th>Contract note</th><th>Last trade</th><th>Holdings</th><th></th></tr></thead><tbody>${fresh}</tbody></table></div>
+    <h3>Recent runs</h3>${runs ? `<div class="tw"><table><thead><tr><th>When</th><th>Run</th><th>Result</th><th>Broker API</th><th>Contract notes</th></tr></thead><tbody>${runs}</tbody></table></div>` : '<ul><li>No runs logged yet.</li></ul>'}
+    <h3>Open checks</h3>${issues ? `<ul>${issues}</ul>` : '<ul><li>None.</li></ul>'}
+    <div style="text-align:right;padding:0 12px 6px"><button class="link-btn" id="statusClose">Close</button></div>`;
+  $('#statusClose').onclick = () => togglePanel(false);
+}
+function togglePanel(open) {
+  const p = $('#statusPanel'); p.hidden = !open; $('#statusPill').setAttribute('aria-expanded', String(open));
+  if (open) { renderPanel(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+}
+$('#statusPill').onclick = () => togglePanel($('#statusPanel').hidden);
+setInterval(renderStatus, 5 * 60e3);   // a page left open turns amber once a run is overdue
+renderStatus();
 $('#sampleBadge').hidden = !D.sample;
 render();
 
