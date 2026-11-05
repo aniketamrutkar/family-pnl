@@ -81,6 +81,13 @@ header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px s
 #holders{padding-top:10px}
 #brokers .chip{min-height:30px;font-size:12.5px;padding:3px 12px}
 .chips .lvl{flex:none;align-self:center;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;min-width:52px}
+.mini-date{position:absolute;left:0;right:0;top:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 16px;background:var(--bg);border-bottom:1px solid var(--border);box-shadow:0 4px 10px -6px rgba(16,24,40,.18)}
+.mini-date[hidden]{display:none}
+.mini-date .md-btn{border:1px solid var(--border-strong);background:var(--surface);border-radius:8px;width:30px;height:28px;display:grid;place-items:center;cursor:pointer;color:var(--text)}
+.mini-date .md-btn:disabled{opacity:.35;cursor:default}
+.mini-date .md-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mini-date .md-day{font-weight:650;font-size:14px;min-width:150px;text-align:center}
+.mini-date .md-net{font-size:13px;font-weight:650}
 .chips .sep{flex:none;width:1px;background:var(--border-strong);margin:4px 2px}
 
 /* ---------- nav ---------- */
@@ -262,6 +269,9 @@ details.sell[open] .lots{animation:viewIn .15s ease-out}
   #holders{padding-top:8px}
   #brokers .chip{min-height:26px;font-size:11.5px;padding:2px 10px}
   .chips .lvl{font-size:9.5px;min-width:44px}
+  .mini-date{padding:5px 14px}
+  .mini-date .md-day{font-size:13px;min-width:130px}
+  .mini-date .md-net{font-size:12px}
   .share-note{padding:0 14px 8px;font-size:11.5px}
   .share{font-size:10px;line-height:15px;padding:0 5px}
   nav.tabs button{font-size:10.5px;gap:2px}
@@ -402,6 +412,7 @@ html.embedded .phone-btn{display:none!important}
   <div class="chips" id="holders" role="tablist" aria-label="Account holder"></div>
   <div class="chips" id="brokers" role="tablist" aria-label="Broker"></div>
   <div class="share-note" id="shareNote" hidden></div>
+  <div class="mini-date" id="miniDate" hidden></div>
   <nav class="tabs" id="tabs" aria-label="Views">
     <button data-tab="day"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg>Day</button>
     <button data-tab="cal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendar</button>
@@ -580,6 +591,13 @@ function go(tab) {
 }
 
 // ---------- Day ----------
+// shows the header's date bar while the Day view's own date pager is scrolled out of sight
+function syncMiniDate() {
+  const md = $('#miniDate'), pager = $('#v-day .pager');
+  md.hidden = S.tab !== 'day' || !pager || pager.getBoundingClientRect().bottom > document.querySelector('header').getBoundingClientRect().bottom;
+}
+addEventListener('scroll', syncMiniDate, { passive: true });
+addEventListener('resize', syncMiniDate);
 function renderDay() {
   const dates = selDates();
   const recs = recsOn(S.date);
@@ -612,6 +630,14 @@ function renderDay() {
   if (recs.length) h += dayTree(recs);
   else h += `<div class="card empty" style="margin-top:12px"><b>No trades</b>${prev ? 'Use ‹ to go to the previous day with trades.' : ''}</div>`;
   $('#v-day').innerHTML = h;
+  // the selected date stays visible: a slim copy of the pager in the pinned header once the big one scrolls away
+  const md = $('#miniDate');
+  md.innerHTML = `<button class="md-btn" id="mdPrev" ${prev ? '' : 'disabled'} aria-label="Previous trading day">${ICON.prev}</button>
+    <span class="md-day">${fmtDay(S.date)}</span>${recs.length ? `<span class="md-net num ${cls(net)}">${signed(net)}</span>` : ''}
+    <button class="md-btn" id="mdNext" ${next ? '' : 'disabled'} aria-label="Next trading day">${ICON.next}</button>`;
+  $('#mdPrev').onclick = () => { S.date = prev; render(); };
+  $('#mdNext').onclick = () => { S.date = next; render(); };
+  syncMiniDate();
   $('#dPrev').onclick = () => { S.date = prev; render(); };
   $('#dNext').onclick = () => { S.date = next; render(); };
   $('#dPick').onchange = e => { if (e.target.value) { S.date = e.target.value; render(); } };
@@ -864,6 +890,7 @@ function renderHold() {
 
 // ---------- render ----------
 function render() {
+  if (S.tab !== 'day') $('#miniDate').hidden = true;
   renderFilters();
   document.querySelectorAll('#tabs [data-tab]').forEach(b => {
     if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
