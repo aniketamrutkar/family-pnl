@@ -923,15 +923,15 @@ function render() {
 }
 
 // ---------- data status: is the data fresh, did the last run work, does anything need a look ----------
-// The job runs at 8:30 PM IST Mon–Fri and 8:00 AM IST Tue–Sat. GitHub can start late, so allow 75 minutes.
+// The job runs at 11:45 PM IST Mon–Fri (broker API + email) and 8:00 AM IST Tue–Sat (late contract notes). GitHub can start late, so allow 75 minutes.
 const IST = 5.5 * 3600e3, GRACE = 75 * 60e3;
 function lastExpectedRun(now = Date.now()) {
   for (let back = 0; back < 8; back++) {
     const d = new Date(now + IST - back * 86400e3), dow = d.getUTCDay();
     const day = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - IST;   // 00:00 IST of that day
     const slots = [];
-    if (dow >= 1 && dow <= 5) slots.push(day + 20.5 * 3600e3);    // evening
-    if (dow >= 2 && dow <= 6) slots.push(day + 8 * 3600e3);       // morning
+    if (dow >= 1 && dow <= 5) slots.push(day + 23.75 * 3600e3);   // 11:45 PM Mon–Fri: broker API + notes + the daily email
+    if (dow >= 2 && dow <= 6) slots.push(day + 8 * 3600e3);       // 8:00 AM Tue–Sat: late contract notes
     for (const t of slots.sort((a, b) => b - a)) if (t + GRACE <= now) return t;
   }
   return 0;
