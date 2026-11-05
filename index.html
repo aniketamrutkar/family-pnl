@@ -147,20 +147,32 @@ details[open] .chev{transform:rotate(90deg)}
 .pill{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:6px;line-height:16px}
 .pill.NA{background:var(--warn-bg);color:var(--warn-text)}
 .pill.LT{background:var(--lt-soft);color:var(--lt)} .pill.ST{background:var(--st-soft);color:var(--st)} .pill.IN{background:var(--in-soft);color:var(--in)}
-.st{padding:2px 16px 8px}
-.st-h,.st-r{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,.95fr);gap:10px;align-items:start}
-.st-h{font-size:11px;color:var(--muted);font-weight:600;padding:2px 0 6px;border-bottom:1px solid var(--border)}
-.st-h span:last-child,.st-r .c4{text-align:right}
-.st-r{padding:8px 0;font-size:14px}
-.st-r + .st-r.first,.st-t + .st-r{border-top:1px dashed var(--border)}
-.st-r > div{display:flex;flex-direction:column;gap:1px;min-width:0}
-.st-r .sym{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.st-r .sub,.st-t .sub{font-size:12px;color:var(--text-2)}
-.st-r .c4 span:first-child{font-weight:650}
-.st-r:not(.first){padding-top:2px}
-.st-t{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-2);padding:2px 0 8px;font-weight:600}
 .muted{color:var(--muted)}
 .badge[hidden]{display:none}
+.holder{margin-top:12px}
+.holder-head{display:flex;align-items:baseline;gap:10px;padding:14px 16px 10px}
+.holder-head .name{font-weight:700;font-size:17px}
+.holder-head .broker{font-size:12px;color:var(--muted)}
+.holder-head .net{margin-left:auto;font-weight:700;font-size:18px}
+.bk{border-top:1px solid var(--border)}
+.bk-head{display:flex;justify-content:space-between;align-items:baseline;padding:10px 16px 6px;font-weight:650;font-size:14px}
+.bk-foot{display:flex;gap:16px;justify-content:flex-end;flex-wrap:wrap;padding:8px 16px 12px;font-size:12.5px;color:var(--text-2)}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 4px}
+.tt{width:100%;border-collapse:collapse;font-size:13.5px;white-space:nowrap}
+.tt th{font-size:11px;font-weight:600;color:var(--muted);text-align:right;padding:4px 10px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em}
+.tt th:first-child,.tt td.sym{text-align:left;padding-left:16px}
+.tt th:nth-child(6),.tt td:nth-child(6){text-align:left}
+.tt th:last-child,.tt td:last-child{padding-right:16px}
+.tt.buys th:nth-child(4),.tt.buys td:nth-child(4){text-align:right}
+.tt td{padding:7px 10px;text-align:right}
+.tt td.sym{font-weight:600;position:sticky;left:0;background:var(--surface)}
+.tt tr.first + tr.first td,.tt tr.tot + tr.first td{border-top:1px dashed var(--border)}
+.tt tr.more td{padding-top:2px}
+.tt tr.tot td{font-size:12px;color:var(--text-2);font-weight:600;padding-top:2px}
+.tt .pl{font-weight:650}
+.tt .pc{display:inline-block;min-width:46px;margin-left:6px;font-size:11.5px;font-weight:500;color:var(--muted)}
+.tt .held{font-size:12px;color:var(--text-2)}
+.tt .d0{display:none}
 .acct-foot{display:flex;justify-content:space-between;padding:10px 16px 12px;border-top:1px solid var(--border);font-size:13px;color:var(--text-2)}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
 .empty b{display:block;color:var(--text-2);font-size:15px;margin-bottom:4px}
@@ -268,14 +280,29 @@ details.sell[open] .lots{animation:viewIn .15s ease-out}
   .row .meta{font-size:11.5px}
   .row .r .v{font-size:13.5px}
   .row .r .p{font-size:10.5px}
-  .st{padding:0 14px 6px}
-  .st-h,.st-r{gap:6px}
-  .st-h{font-size:9.5px;padding:1px 0 4px}
-  .st-r{padding:6px 0;font-size:12.5px}
-  .st-r .sym{font-size:13px}
-  .st-r .sub,.st-t .sub{font-size:10.5px}
-  .st-r .pill{font-size:9px;padding:0 4px;line-height:14px}
-  .st-t{font-size:11px;padding:1px 0 6px}
+  .holder{margin-top:10px}
+  .holder-head{padding:10px 14px 7px}
+  .holder-head .name{font-size:15px}
+  .holder-head .broker{font-size:11px}
+  .holder-head .net{font-size:15px}
+  .bk-head{padding:8px 14px 4px;font-size:12.5px}
+  .bk-foot{padding:6px 14px 9px;font-size:11px;gap:12px}
+  .tt{font-size:11.5px}
+  .tt th{font-size:9.5px;padding:3px 7px}
+  .tt td{padding:6px 7px}
+  .tt th:first-child,.tt td.sym{padding-left:14px}
+  .tt th:last-child,.tt td:last-child{padding-right:14px}
+  .tt .pc{min-width:40px;font-size:10px;margin-left:4px}
+  .tt .held{font-size:10.5px}
+  .tt .d2,.tt .pc{display:none}
+  .tt .d0{display:inline}
+  .tt .held{display:none}
+  .tt td.sym{max-width:74px;overflow:hidden;text-overflow:ellipsis}
+  .tt th{letter-spacing:0}
+  .tt th{padding:3px 4px} .tt td{padding:6px 4px}
+  .tt th:first-child,.tt td.sym{padding-left:12px}
+  .tt th:last-child,.tt td:last-child{padding-right:12px}
+  .tt .pill{font-size:9px;padding:0 4px;line-height:14px}
   .chev{width:14px;height:14px}
   .lots{margin:0 14px 9px;padding:2px 10px;border-radius:8px}
   .lot{font-size:11.5px;padding:6px 0;gap:8px}
@@ -553,61 +580,71 @@ function renderDay() {
     </div></div>`;
   h += warns.map(alertHtml).join('');
 
-  if (recs.length) {
-    h += `<h2>By account</h2><div class="grid">`;
-    const order = D.accounts.map(a => a.id);
-    for (const r of [...recs].sort((a, b) => order.indexOf(a.account) - order.indexOf(b.account))) h += acctCard(r);
-    h += `</div>`;
-  } else {
-    h += `<div class="card empty" style="margin-top:12px"><b>No trades</b>${prev ? 'Use ‹ to go to the previous day with trades.' : ''}</div>`;
-  }
+  if (recs.length) h += dayTree(recs);
+  else h += `<div class="card empty" style="margin-top:12px"><b>No trades</b>${prev ? 'Use ‹ to go to the previous day with trades.' : ''}</div>`;
   $('#v-day').innerHTML = h;
   $('#dPrev').onclick = () => { S.date = prev; render(); };
   $('#dNext').onclick = () => { S.date = next; render(); };
   $('#dPick').onchange = e => { if (e.target.value) { S.date = e.target.value; render(); } };
   const latest = $('#dLatest'); if (latest) latest.onclick = () => { S.date = D.asOf; render(); };
 }
-// Sold stocks as one always-open table: a line per buy lot, so sell vs buy price, buy date and holding time show at once.
+// Day view as nested tables: holder (PEW, JPW, with the view's share) → broker (Zerodha, Angel One) → one line per lot.
 const heldTxt = (from, to) => {
   const d = daysBetween(from, to);
   if (d < 60) return d + 'd';
   const m = Math.round(d / 30.44);
   return m < 12 ? m + 'm' : Math.floor(m / 12) + 'y' + (m % 12 ? ' ' + (m % 12) + 'm' : '');
 };
-function sellTable(r) {
-  let h = `<div class="st"><div class="st-h"><span>Scrip · qty</span><span>Sold · bought</span><span>Bought on · held</span><span>P&amp;L</span></div>`;
-  for (const s of r.sells) {
-    const multi = s.lots.length > 1;
-    [...s.lots].sort((a, b) => (a.t === 'IN') - (b.t === 'IN') || (a.d || '9').localeCompare(b.d || '9')).forEach((l, i) => {
-      const first = i === 0;
-      const g = l.p == null ? null : (s.p - l.p) * l.q;
-      h += `<div class="st-r${first ? ' first' : ''}">
-        <div class="c1">${first ? `<span class="sym">${esc(s.s)}</span>` : ''}<span class="sub num">${qty(l)}${multi ? ` of ${qty(s)}` : ''}</span></div>
-        <div class="c2 num"><span>${rsP(s.p)}</span><span class="sub">${l.p == null ? 'no buy record' : rsP(l.p)}</span></div>
-        <div class="c3 num"><span>${l.p == null ? '—' : l.t === 'IN' ? 'Same day' : fmtShort(l.d)}</span>
-          <span class="sub"><span class="pill ${l.t}">${{ IN: 'INTRADAY', ST: 'ST', LT: 'LT', NA: 'COST ?' }[l.t]}</span>${l.p != null && l.t !== 'IN' ? ' ' + heldTxt(l.d, r.date) : ''}</span></div>
-        <div class="c4 num">${g == null ? '<span class="muted">—</span>' : `<span class="${cls(g)}">${signed(g)}</span><span class="sub">${pct(g, l.p * l.q)}</span>`}</div>
-      </div>`;
-    });
-    if (multi) h += `<div class="st-t"><span>${esc(s.s)} total</span><span class="num ${cls(s.gross)}">${signed(s.gross)} <span class="sub">${pct(s.gross, s.cost)}</span></span></div>`;
+const BROKER_ORDER = ['Zerodha', 'Angel One'];
+const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dShort = d => `${+d.slice(8)} ${MON3[+d.slice(5, 7) - 1]} ${d.slice(2, 4)}`;   // 16 Sep 24
+// prices: full on laptop (₹1,300.00), compact on phones (1,300; small prices keep paise: 12.74)
+const nfc = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
+const px2 = n => `<span class="d2">${rsP(n)}</span><span class="d0">${n >= 100 ? nfc.format(Math.round(n)) : nf2.format(n)}</span>`;
+const TERM = { IN: 'INTRADAY', ST: 'ST', LT: 'LT', NA: 'COST ?' };
+function dayTree(recs) {
+  const byAcc = Object.fromEntries(recs.map(r => [r.account, r]));
+  const ids = selAccounts();
+  const holders = [...new Set(ids.map(id => ACC[id].person))];
+  let h = '';
+  for (const p of holders) {
+    const accs = ids.filter(id => ACC[id].person === p).sort((x, y) => BROKER_ORDER.indexOf(ACC[x].broker) - BROKER_ORDER.indexOf(ACC[y].broker));
+    const k = shareOf(accs[0]);
+    const pnet = sum(accs, id => byAcc[id] ? byAcc[id].net : 0);
+    h += `<div class="card holder"><div class="holder-head"><div><div class="name">${esc(PERSON[p].name)}</div>
+      <div class="broker">${k < 1 ? `${pctTxt(k)} share · amounts are this share` : 'Full account'}</div></div>
+      <div class="net num ${cls(pnet)}">${accs.some(id => byAcc[id]) ? signed(pnet) : '—'}</div></div>`;
+    for (const id of accs) h += brokerBlock(ACC[id], byAcc[id]);
+    h += `</div>`;
   }
-  return h + `</div>`;
+  return h;
 }
-function acctCard(r) {
-  const a = ACC[r.account];
-  let h = `<div class="card"><div class="acct-head"><div><div class="name">${esc(PERSON[a.person].name)}</div><div class="broker">${esc(a.broker)}${shareOf(r.account) < 1 ? `<span class="share">${pctTxt(shareOf(r.account))} share</span>` : ''}</div></div>
-    <div class="net num ${cls(r.net)}">${signed(r.net)}</div></div>`;
+function brokerBlock(a, r) {
+  let h = `<div class="bk"><div class="bk-head"><span>${esc(a.broker)}</span>${r ? `<span class="num ${cls(r.net)}">${signed(r.net)}</span>` : '<span class="muted">No trades</span>'}</div>`;
+  if (!r) return h + '</div>';
   if (r.sells.length) {
-    h += `<div class="sec-label">Sold</div>`;
-    h += sellTable(r);
+    h += `<div class="tw"><table class="tt"><thead><tr><th>Sold</th><th>Qty</th><th>Sell</th><th>Buy</th><th>Bought on</th><th>Term</th><th>P&amp;L</th></tr></thead><tbody>`;
+    for (const s of r.sells) {
+      const lots = [...s.lots].sort((x, y) => (x.t === 'IN') - (y.t === 'IN') || (x.d || '9').localeCompare(y.d || '9'));
+      lots.forEach((l, i) => {
+        const g = l.p == null ? null : (s.p - l.p) * l.q;
+        h += `<tr class="${i === 0 ? 'first' : 'more'}"><td class="sym">${i === 0 ? esc(s.s) : ''}</td><td class="num">${qty(l)}</td>
+          <td class="num">${px2(s.p)}</td><td class="num">${l.p == null ? '—' : px2(l.p)}</td>
+          <td class="num">${l.p == null ? 'no record' : l.t === 'IN' ? 'same day' : dShort(l.d)}</td>
+          <td><span class="pill ${l.t}">${TERM[l.t]}</span>${l.p != null && l.t !== 'IN' ? ` <span class="held">${heldTxt(l.d, r.date)}</span>` : ''}</td>
+          <td class="num pl ${g == null ? '' : cls(g)}">${g == null ? '—' : signed(g)}${g == null ? '' : `<span class="pc">${pct(g, l.p * l.q)}</span>`}</td></tr>`;
+      });
+      if (lots.length > 1) h += `<tr class="tot"><td class="sym"><span class="d2">${esc(s.s)} total</span><span class="d0">Total</span></td><td class="num">${qty(s)}</td><td></td><td></td><td></td><td></td>
+        <td class="num pl ${cls(s.gross)}">${signed(s.gross)}<span class="pc">${pct(s.gross, s.cost)}</span></td></tr>`;
+    }
+    h += `</tbody></table></div>`;
   }
   if (r.buys.length) {
-    h += `<div class="sec-label">Bought</div>`;
-    h += r.buys.map(b => `<div class="row"><div class="l"><div class="sym">${esc(b.s)}</div><div class="meta num">${qty(b)} @ ${rsP(b.p)}</div></div>
-      <div class="r"><div class="v num">${rs(b.q * b.p)}</div></div></div>`).join('');
+    h += `<div class="tw"><table class="tt buys"><thead><tr><th>Bought</th><th>Qty</th><th>Price</th><th>Value</th></tr></thead><tbody>`;
+    for (const b of r.buys) h += `<tr class="first"><td class="sym">${esc(b.s)}</td><td class="num">${qty(b)}</td><td class="num">${px2(b.p)}</td><td class="num">${rs(qty(b) * b.p)}</td></tr>`;
+    h += `</tbody></table></div>`;
   }
-  h += `<div class="acct-foot"><span>Gross <b class="num ${cls(r.gross)}">${signed(r.gross)}</b></span><span>Charges <b class="num">${rs(r.charges)}</b></span></div></div>`;
-  return h;
+  return h + `<div class="bk-foot"><span>Gross <b class="num ${cls(r.gross)}">${signed(r.gross)}</b></span><span>Charges <b class="num">${rs(r.charges)}</b></span><span>Net <b class="num ${cls(r.net)}">${signed(r.net)}</b></span></div></div>`;
 }
 
 // ---------- Calendar ----------
