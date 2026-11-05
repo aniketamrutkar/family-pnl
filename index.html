@@ -204,7 +204,29 @@ details[open] .chev{transform:rotate(90deg)}
 .tt .pc{display:inline-block;min-width:46px;margin-left:6px;font-size:11.5px;font-weight:500;color:var(--muted)}
 .tt .held{font-size:12px;color:var(--text-2)}
 .tt .d0{display:none}
+.lt .d0{display:none}
+.lt .ph{display:none}
 .tt .tp{display:none}
+/* ---------- stock lens ---------- */
+.lens-tools{display:flex;gap:8px;align-items:center;margin:14px 0 10px;flex-wrap:wrap}
+.lens-tools input{flex:1;min-width:140px;height:36px;border:1px solid var(--border-strong);border-radius:10px;padding:0 12px;font:inherit;font-size:14px;background:var(--surface);color:var(--text)}
+.lt{width:100%;border-collapse:collapse;font-size:13.5px;white-space:nowrap}
+.lt th{font-size:11px;font-weight:600;color:var(--muted);text-align:right;padding:8px 10px 6px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em}
+.lt th:first-child,.lt td:first-child{text-align:left;padding-left:16px;position:sticky;left:0;background:var(--surface)}
+.lt th:last-child,.lt td:last-child{padding-right:16px}
+.lt td{padding:9px 10px;text-align:right;border-top:1px dashed var(--border)}
+.lt tr.row-s{cursor:pointer}
+.lt tr.row-s:hover td{background:var(--surface-2)}
+.lt td.sym{font-weight:600}
+.lt .sub{display:block;font-size:11.5px;color:var(--muted);font-weight:500}
+.lt .pl{font-weight:650}
+.lt tr.det td{padding:0 0 10px;border-top:0;position:static;background:var(--surface)}
+.ev{margin:0 16px;border-radius:10px;background:var(--surface-2);padding:4px 12px;font-size:12.5px}
+.ev div{display:grid;grid-template-columns:74px 44px 1fr auto;gap:8px;padding:5px 0;align-items:baseline}
+.ev div + div{border-top:1px solid var(--border)}
+.ev .bs{font-weight:700;font-size:10.5px;letter-spacing:.04em}
+.ev .bs.B{color:var(--in)} .ev .bs.S{color:var(--lt)}
+.ev .r{text-align:right;font-weight:600}
 .acct-foot{display:flex;justify-content:space-between;padding:10px 16px 12px;border-top:1px solid var(--border);font-size:13px;color:var(--text-2)}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
 .empty b{display:block;color:var(--text-2);font-size:15px;margin-bottom:4px}
@@ -348,6 +370,22 @@ details.sell[open] .lots{animation:viewIn .15s ease-out}
   .tt th:first-child,.tt td.sym{padding-left:12px}
   .tt th:last-child,.tt td:last-child{padding-right:12px}
   .tt .pill{font-size:9px;padding:0 4px;line-height:14px}
+  .lt{font-size:12px}
+  .lt th{font-size:9.5px;padding:6px 6px 4px;letter-spacing:0}
+  .lt td{padding:7px 6px}
+  .lt th:first-child,.lt td:first-child{padding-left:12px}
+  .lt th:last-child,.lt td:last-child{padding-right:12px}
+  .lt .sub{font-size:10px}
+  .lt .d2{display:none} .lt .d0{display:inline}
+  .lt .lp{display:none} .lt .ph{display:table-cell}
+  .lt{font-size:11.5px}
+  .lt th{padding:6px 4px 4px} .lt td{padding:7px 4px}
+  .lt td.sym{max-width:74px;overflow:hidden;text-overflow:ellipsis}
+  .ev{white-space:normal;position:sticky;left:12px;width:calc(100vw - 48px);box-sizing:border-box}
+  .ev div{grid-template-columns:52px 30px 1fr auto}
+  .ev{margin:0 12px;font-size:11.5px}
+  .ev div{grid-template-columns:62px 36px 1fr auto;gap:6px}
+  .lens-tools input{height:32px;font-size:13px}
   .chev{width:14px;height:14px}
   .lots{margin:0 14px 9px;padding:2px 10px;border-radius:8px}
   .lot{font-size:11.5px;padding:6px 0;gap:8px}
@@ -439,6 +477,7 @@ html.embedded .phone-btn{display:none!important}
     <button data-tab="cal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendar</button>
     <button data-tab="tax"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Tax</button>
     <button data-tab="hold"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4z"/><path d="M9 7V4h6v3"/></svg>Holdings</button>
+    <button data-tab="lens"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/><path d="M8.5 12.5l2-2 1.5 1.5 2.5-3"/></svg>Stock Lens</button>
   </nav>
 </header>
 
@@ -449,6 +488,7 @@ html.embedded .phone-btn{display:none!important}
   <section class="view" id="v-cal" hidden></section>
   <section class="view" id="v-tax" hidden></section>
   <section class="view" id="v-hold" hidden></section>
+  <section class="view" id="v-lens" hidden></section>
   <section class="view card" id="selftest" hidden></section>
 </main>
 
@@ -509,8 +549,9 @@ const VIEWS = D.views || D.people.map(p => ({ id: p.id, name: p.name,
   shares: Object.fromEntries(D.accounts.filter(a => a.person === p.id).map(a => [a.id, 1])) }));
 const VIEW = Object.fromEntries(VIEWS.map(v => [v.id, v]));
 const S = {
-  tab: ['day', 'cal', 'tax', 'hold'].includes(location.hash.slice(1)) ? location.hash.slice(1) : store.get('tab', 'day'),
+  tab: ['day', 'cal', 'tax', 'hold', 'lens'].includes(location.hash.slice(1)) ? location.hash.slice(1) : store.get('tab', 'day'),
   view: new URLSearchParams(location.search).get('view') || store.get('view', null), holder: store.get('holder', 'ALL'), broker: store.get('broker', 'ALL'),
+  lensSort: store.get('lensSort', 'pnl'), lensQ: '', lensOpen: null,
   date: (q => /^\d{4}-\d{2}-\d{2}$/.test(q || '') ? q : D.asOf)(new URLSearchParams(location.search).get('date')), month: D.asOf.slice(0, 7), fy: fyOf(D.asOf), holdSort: store.get('holdSort', 'pnl'),
 };
 if (!VIEW[S.view]) S.view = VIEWS[0].id;
@@ -726,6 +767,85 @@ function brokerBlock(a, r) {
   return h + `<div class="bk-foot"><span>Gross <b class="num ${cls(r.gross)}">${signed(r.gross)}</b></span><span>Charges <b class="num">${rs(r.charges)}</b></span><span>Net <b class="num ${cls(r.net)}">${signed(r.net)}</b></span></div></div>`;
 }
 
+
+// ---------- Stock Lens: profit or loss per stock, all time, for the selected person / account / broker ----------
+// Realised P&L is the share of each sale's gain before charges (charges are per day, not per stock). Buy prices come
+// from the buy records plus the buy lots of sales and holdings (so buys from before the trade history count too).
+function lensData() {
+  const by = {};
+  const S0 = sym => (by[sym] = by[sym] || { s: sym, realised: 0, cost: 0, sold: 0, bought: 0, buys: [], sells: [], seen: new Set(), held: 0, open: 0, openCost: 0, accounts: new Set() });
+  const multi = new Set(selAccounts()).size > 1;
+  const tag = acc => multi ? ACC[acc].label : '';
+  for (const r of V().records) {
+    for (const b of r.buys) { const x = S0(b.s); x.buys.push({ d: r.date, q: qty(b), p: b.p, acc: tag(r.account) }); x.seen.add(r.account + r.date + b.p); x.bought += qty(b); x.accounts.add(r.account); }
+    for (const sl of r.sells) {
+      const x = S0(sl.s); x.realised += sl.gross; x.cost += sl.cost || 0; x.sold += qty(sl); x.accounts.add(r.account);
+      x.sells.push({ d: r.date, q: qty(sl), p: sl.p, g: sl.gross, acc: tag(r.account) });
+      for (const l of sl.lots) if (l.p != null && l.d && !x.seen.has(r.account + l.d + l.p)) { x.seen.add(r.account + l.d + l.p); x.buys.push({ d: l.d, q: qty(l), p: l.p, acc: tag(r.account), lot: true }); }
+    }
+  }
+  for (const h of V().holdings) {
+    const x = S0(h.s); x.accounts.add(h.account);
+    for (const l of h.lots) {
+      x.held += qty(l); x.open += (h.ltp - l.p) * l.q; x.openCost += l.p * l.q;
+      if (!x.seen.has(h.account + l.d + l.p)) { x.seen.add(h.account + l.d + l.p); x.buys.push({ d: l.d, q: qty(l), p: l.p, acc: tag(h.account), lot: true }); }
+    }
+  }
+  const ext = (arr, f) => arr.length ? arr.reduce((m, e) => f(e.p, m.p) ? e : m) : null;
+  return Object.values(by).map(x => {
+    const paid = x.buys.filter(b => b.p > 0);   // bonus / demerger lots at ₹0 are not a buy price
+    return { ...x, lowB: ext(paid, (a, b) => a < b), highB: ext(paid, (a, b) => a > b), lowS: ext(x.sells, (a, b) => a < b), highS: ext(x.sells, (a, b) => a > b) };
+  });
+}
+function renderLens() {
+  const all = lensData();
+  const q = S.lensQ.trim().toUpperCase();
+  const rows = all.filter(x => !q || x.s.includes(q));
+  const sorters = { pnl: (a, b) => b.realised - a.realised, loss: (a, b) => a.realised - b.realised, name: (a, b) => a.s.localeCompare(b.s),
+    trades: (a, b) => (b.buys.length + b.sells.length) - (a.buys.length + a.sells.length), open: (a, b) => b.open - a.open };
+  rows.sort(sorters[S.lensSort] || sorters.pnl);
+  const total = sum(all, x => x.realised), won = all.filter(x => x.realised > 0.5), lost = all.filter(x => x.realised < -0.5);
+  const best = [...all].sort((a, b) => b.realised - a.realised)[0], worst = [...all].sort((a, b) => a.realised - b.realised)[0];
+  const px = e => e ? `${px2(e.p)}<span class="sub">${dShort(e.d)}</span>` : '<span class="muted">—</span>';
+  const rng = (lo, hi) => lo ? `${px2(lo.p)}<span class="sub">${px2(hi.p)}</span>` : '<span class="muted">—</span>';   // phones: low over high
+  let h = `<div class="card"><div class="hero"><div class="label">Realised P&amp;L across all stocks, all time (before charges)</div>
+      <div class="big num ${cls(total)}">${signed(total)}</div>
+      <div class="sub">${all.length} stocks · ${won.length} in profit · ${lost.length} in loss</div></div>
+    <div class="stats"><div class="stat"><div class="k">Best stock</div><div class="v num ${best ? cls(best.realised) : ''}">${best ? esc(best.s) + ' ' + signed(best.realised) : '—'}</div></div>
+      <div class="stat"><div class="k">Worst stock</div><div class="v num ${worst ? cls(worst.realised) : ''}">${worst ? esc(worst.s) + ' ' + signed(worst.realised) : '—'}</div></div>
+      <div class="stat"><div class="k">Open P&amp;L on held shares</div><div class="v num ${cls(sum(all, x => x.open))}">${signed(sum(all, x => x.open))}</div></div>
+      <div class="stat"><div class="k">Trades</div><div class="v num">${sum(all, x => x.buys.length)} buys · ${sum(all, x => x.sells.length)} sales</div></div></div></div>
+    <div class="lens-tools"><input id="lensQ" type="search" placeholder="Search a stock…" value="${esc(S.lensQ)}" aria-label="Search a stock">
+      <div class="seg" role="group" aria-label="Sort">${[['pnl', 'Profit'], ['loss', 'Loss'], ['open', 'Open'], ['trades', 'Trades'], ['name', 'A–Z']]
+        .map(([k, n]) => `<button data-lsort="${k}" aria-pressed="${S.lensSort === k}">${n}</button>`).join('')}</div></div>`;
+  if (!rows.length) { $('#v-lens').innerHTML = h + `<div class="card empty"><b>No stocks</b>${q ? 'Nothing matches “' + esc(S.lensQ) + '”.' : 'No trades for this selection.'}</div>`; bindLens(); return; }
+  h += `<div class="card"><div class="tw"><table class="lt"><thead><tr><th>Stock</th><th>Realised</th><th><span class="d2">Held · open P&amp;L</span><span class="d0">Held</span></th><th class="lp">Buy low</th><th class="lp">Buy high</th><th class="lp">Sell low</th><th class="lp">Sell high</th><th class="lp">Trades</th><th class="ph">Buy L–H</th><th class="ph">Sell L–H</th></tr></thead><tbody>`;
+  for (const x of rows) {
+    const open = S.lensOpen === x.s;
+    h += `<tr class="row-s" data-sym="${esc(x.s)}" aria-expanded="${open}"><td class="sym">${esc(x.s)}</td>
+      <td class="num pl ${x.sells.length ? cls(x.realised) : ''}">${x.sells.length ? plTxt(x.realised) : '<span class="muted">—</span>'}${x.sells.length && x.cost ? `<span class="sub">${pct(x.realised, x.cost)}</span>` : ''}</td>
+      <td class="num">${x.held ? x.held : '<span class="muted">—</span>'}${x.held ? `<span class="sub ${cls(x.open)}">${plTxt(x.open)}</span>` : ''}</td>
+      <td class="num lp">${px(x.lowB)}</td><td class="num lp">${px(x.highB)}</td><td class="num lp">${px(x.lowS)}</td><td class="num lp">${px(x.highS)}</td>
+      <td class="num lp">${x.buys.length}B · ${x.sells.length}S</td>
+      <td class="num ph">${rng(x.lowB, x.highB)}</td><td class="num ph">${rng(x.lowS, x.highS)}</td></tr>`;
+    if (open) {
+      const ev = [...x.buys.map(b => ({ ...b, k: 'B' })), ...x.sells.map(e => ({ ...e, k: 'S' }))].sort((a, b) => b.d.localeCompare(a.d) || (a.k === 'S' ? -1 : 1));
+      h += `<tr class="det"><td colspan="10"><div class="ev">${ev.map(e => `<div><span class="num">${dShort(e.d)}</span><span class="bs ${e.k}">${e.k === 'B' ? 'BUY' : 'SELL'}</span>
+        <span class="num">${e.q} @ ${rsP(e.p)} = ${rs(e.q * e.p)}${e.acc ? ` <span class="muted">· ${esc(e.acc)}</span>` : ''}${e.lot ? ' <span class="muted">· from lots</span>' : ''}</span>
+        <span class="r num ${e.k === 'S' ? cls(e.g) : ''}">${e.k === 'S' ? signed(e.g) : ''}</span></div>`).join('')}</div></td></tr>`;
+    }
+  }
+  h += `</tbody></table></div></div><p class="note">Realised P&amp;L is your share of each sale's gain before charges (charges are billed per day, not per stock). Buy prices include buys from before the trade history (from the sold and held lots); bonus shares at ₹0 are left out of "Buy low". Tap a stock for every buy and sale.</p>`;
+  $('#v-lens').innerHTML = h;
+  bindLens();
+}
+function bindLens() {
+  const qi = $('#lensQ');
+  if (qi) qi.oninput = e => { S.lensQ = e.target.value; const pos = e.target.selectionStart; renderLens(); const n = $('#lensQ'); n.focus(); n.setSelectionRange(pos, pos); };
+  document.querySelectorAll('[data-lsort]').forEach(b => b.onclick = () => { S.lensSort = b.dataset.lsort; store.set('lensSort', S.lensSort); renderLens(); });
+  document.querySelectorAll('#v-lens tr.row-s').forEach(tr => tr.onclick = () => { S.lensOpen = S.lensOpen === tr.dataset.sym ? null : tr.dataset.sym; renderLens(); });
+}
+
 // ---------- Calendar ----------
 function dayNets() {
   const m = {};
@@ -918,8 +1038,8 @@ function render() {
   document.querySelectorAll('#tabs [data-tab]').forEach(b => {
     if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  for (const t of ['day', 'cal', 'tax', 'hold']) $('#v-' + t).hidden = t !== S.tab;
-  ({ day: renderDay, cal: renderCal, tax: renderTax, hold: renderHold })[S.tab]();
+  for (const t of ['day', 'cal', 'tax', 'hold', 'lens']) $('#v-' + t).hidden = t !== S.tab;
+  ({ day: renderDay, cal: renderCal, tax: renderTax, hold: renderHold, lens: renderLens })[S.tab]();
 }
 
 // ---------- data status: is the data fresh, did the last run work, does anything need a look ----------
@@ -1008,7 +1128,7 @@ function phoneView(on) {
   const v = store.get('view', S.view), t = store.get('tab', S.tab);
   if (VIEW[v]) S.view = v;
   S.holder = store.get('holder', 'ALL'); S.broker = store.get('broker', 'ALL'); fixFilters();
-  if (['day', 'cal', 'tax', 'hold'].includes(t)) { S.tab = t; history.replaceState(null, '', '#' + t); }
+  if (['day', 'cal', 'tax', 'hold', 'lens'].includes(t)) { S.tab = t; history.replaceState(null, '', '#' + t); }
   render();
 }
 $('#phoneBtn').onclick = () => phoneView(true);
@@ -1035,7 +1155,7 @@ if (location.hash === '#selftest') {
   ok(D.records.every(r => r.sells.every(s => s.lots.every(l => l.t !== 'LT' || daysBetween(r.date, ltDate(l.d)) <= 1))), 'long-term lots were held 12 months or more');
   ok(D.records.every(r => r.sells.every(s => s.lots.every(l => l.t !== 'ST' || r.date < ltDate(l.d)))), 'short-term lots were held 12 months or less');
   ok(D.records.every(r => r.sells.every(s => s.lots.every(l => (l.t === 'NA') === (l.p == null)))), 'unknown-cost lots are marked NA');
-  for (const t of ['day', 'cal', 'tax', 'hold']) {
+  for (const t of ['day', 'cal', 'tax', 'hold', 'lens']) {
     try { S.tab = t; render(); ok($('#v-' + t).innerHTML.length > 200, 'view renders: ' + t); } catch (e) { ok(false, 'view ' + t + ': ' + e.message); }
   }
   S.view = 'DD'; S.holder = 'PEW'; S.broker = 'Angel One'; S.tab = 'day'; render();
@@ -1045,15 +1165,17 @@ if (location.hash === '#selftest') {
   ok(Math.abs(netOf('ANUP') - pew / 2) < 1, 'Anup = 50% of PEW');
   ok(Math.abs(netOf('DD') - (jpw + pew / 2)) < 1, 'DD = 100% of JPW + 50% of PEW');
   ok(Math.abs(netOf('ANUP') + netOf('DD') - (pew + jpw)) < 1, 'Anup + DD = PEW + JPW');
-  try { for (const v of ['ANUP', 'DD']) for (const hb of [['ALL', 'ALL'], ['PEW', 'Zerodha'], ['JPW', 'Angel One']]) for (const t of ['day', 'cal', 'tax', 'hold']) { S.view = v; [S.holder, S.broker] = hb; fixFilters(); S.tab = t; render(); } ok(true, 'Anup and DD views render'); }
+  try { for (const v of ['ANUP', 'DD']) for (const hb of [['ALL', 'ALL'], ['PEW', 'Zerodha'], ['JPW', 'Angel One']]) for (const t of ['day', 'cal', 'tax', 'hold', 'lens']) { S.view = v; [S.holder, S.broker] = hb; fixFilters(); S.tab = t; render(); } ok(true, 'Anup and DD views render'); }
   catch (e) { ok(false, 'share views: ' + e.message); }
+  S.view = 'DD'; S.holder = 'ALL'; S.broker = 'ALL'; fixFilters(); S.tab = 'lens'; render();
+  ok($('#v-lens').innerHTML.length > 200 && Math.abs(sum(lensData(), x => x.realised) - sum(V().records, r => r.gross)) < 1, 'Stock Lens renders and its total = sum of day gross');
   ok(Math.abs(sum(D.accounts.map(a => a.id), id => sum(D.records.filter(r => r.account === id), r => r.net)) - sum(D.records, r => r.net)) < 1, 'per-account totals add up to the family total');
   ok(compact(125000) === '+1.25L' && compact(-4500) === MINUS + '4.5k' && compact(12500000) === '+1.25Cr', 'compact INR format');
   ok(document.documentElement.scrollWidth <= window.innerWidth + 1, 'no horizontal page scroll at ' + window.innerWidth + 'px');
   phoneView(true); ok(!$('#phoneView').hidden && $('#pvIframe').getAttribute('src').endsWith('#' + S.tab), 'phone view opens the page in a frame');
   phoneView(false); ok($('#phoneView').hidden, 'phone view closes'); store.set('phone', false);
   S.view = TOP[0].id; S.holder = 'ALL'; S.broker = 'ALL'; fixFilters();
-  for (const v of ['day', 'cal', 'tax', 'hold']) $('#v-' + v).hidden = true;
+  for (const v of ['day', 'cal', 'tax', 'hold', 'lens']) $('#v-' + v).hidden = true;
   const st = $('#selftest'); st.hidden = false; st.textContent = out.join('\n');
 }
 </script>
