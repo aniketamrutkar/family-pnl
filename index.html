@@ -62,7 +62,8 @@ button{font:inherit;color:inherit}
 /* ---------- header ---------- */
 header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--border)}
 .head-row{display:flex;align-items:center;gap:10px;padding:10px 16px 6px;max-width:1180px;margin:0 auto}
-.brand{font-weight:700;font-size:18px;letter-spacing:-.01em}
+.brand{font-weight:700;font-size:18px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.brand .logo{width:28px;height:28px;flex:none}
 .asof{font-size:12px;color:var(--muted);margin-left:auto;text-align:right;line-height:1.25}
 .badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--warn-bg);color:var(--warn-text);border:1px solid var(--warn-border);vertical-align:2px;margin-left:6px}
 .chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:4px 16px 10px;max-width:1180px;margin:0 auto}
@@ -481,7 +482,7 @@ html.embedded .phone-btn{display:none!important}
 <body>
 <header>
   <div class="head-row">
-    <div class="brand">Family P&amp;L<span class="badge" id="sampleBadge" hidden>Sample data</span></div>
+    <div class="brand"><svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="logoG" x1="0" y1="0" x2=".35" y2="1"><stop offset="0" stop-color="#3b86e8"/><stop offset="1" stop-color="#1f5fb8"/></linearGradient></defs><rect width="48" height="48" rx="11" fill="url(#logoG)"/><g fill="none" stroke="#fff" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 31.5l7.5-7.5 6 6 12-12"/><path d="M27 18h9v9"/></g></svg>Family P&amp;L<span class="badge" id="sampleBadge" hidden>Sample data</span></div>
     <button class="icon-btn reload-btn" id="reloadBtn" type="button" title="Reload the latest data" aria-label="Reload the latest data">
       <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
     <button class="status-pill" id="statusPill" type="button" aria-controls="statusPanel" aria-expanded="false"></button>
