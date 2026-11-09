@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#111317" media="(prefers-color-scheme: dark)">
 <meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
 <title>Family P&amp;L</title>
 <style>
 :root{
@@ -97,6 +99,8 @@ header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px s
 .status-pill .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--gain)}
 .status-pill.warn .dot{background:#d99a00} .status-pill.error .dot{background:var(--loss)}
 .status-pill.warn{border-color:var(--warn-border)} .status-pill.error{border-color:var(--err-border)}
+.status-pill.sync .dot{background:var(--accent);animation:pulse 1.2s ease-in-out infinite} .status-pill.sync{border-color:var(--accent)}
+@keyframes pulse{50%{opacity:.25}}
 #statusBar .alert{margin:0 0 12px;cursor:pointer}
 #statusBar .alert ul{margin:4px 0 0;padding-left:18px}
 .status-panel{margin:0 0 12px;padding:4px 0}
@@ -1197,10 +1201,87 @@ function togglePanel(open) {
   if (open) { renderPanel(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 }
 $('#statusPill').onclick = () => togglePanel($('#statusPanel').hidden);
-// the service worker fetches the encrypted files with no-cache, so a plain reload always gets the latest published data
-$('#reloadBtn').onclick = () => { $('#reloadBtn').classList.add('spin'); location.reload(); };
-setInterval(renderStatus, 5 * 60e3);   // a page left open turns amber once a run is overdue
+// ---------- Reload: fetch from the brokers now ----------
+// D.sync (only in the published, encrypted page) = { repo, workflow, ref, token }: a GitHub token that can only start and
+// watch the engine's Actions runs. Reload starts the 'sync' run (Angel API for today + contract notes since the last run),
+// follows it, waits until the new data is published and then reloads. Without D.sync (local/sample) it just reloads:
+// the service worker fetches the encrypted files with no-cache, so a plain reload always gets the latest published data.
+const SYNC_KEY = 'sync', SYNC_MAX = 15 * 60e3;
+let syncing = false;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function gh(path, opt = {}) {
+  const r = await fetch(`https://api.github.com/repos/${D.sync.repo}${path}`, { ...opt, cache: 'no-store', headers: {
+    Authorization: 'Bearer ' + D.sync.token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
+    ...(opt.body && { 'Content-Type': 'application/json' }) } });
+  if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'the GitHub token was refused (expired?)' : `GitHub said ${r.status}`);
+  return r.status === 204 ? null : r.json();
+}
+const ACTIVE = ['queued', 'in_progress', 'waiting', 'pending', 'requested'];
+function syncUI(text) {
+  const pill = $('#statusPill');
+  pill.className = 'status-pill sync';
+  pill.innerHTML = `<span class="dot"></span><span>Fetching ·<br><b>${esc(text)}</b></span>`;
+  pill.title = 'Fetching the latest trades from the brokers';
+}
+function syncFailed(text) {
+  syncing = false; store.set(SYNC_KEY, null); $('#reloadBtn').classList.remove('spin'); renderStatus();
+  $('#statusBar').insertAdjacentHTML('afterbegin', `<div class="alert error" role="alert">${ICON.warn}<div><b>Couldn't fetch from the brokers</b><ul><li>${esc(text)}</li></ul></div></div>`);
+}
+async function startSync() {
+  const t0 = Date.now(), wf = `/actions/workflows/${D.sync.workflow}/runs?per_page=10`;
+  syncUI('starting');
+  // a run already going (scheduled job or an earlier tap) publishes too: follow it instead of queueing another
+  // (a second pending run would replace the first in the job's queue)
+  let run = ((await gh(wf)).workflow_runs || []).find(r => ACTIVE.includes(r.status));
+  if (!run) {
+    await gh(`/actions/workflows/${D.sync.workflow}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: D.sync.ref, inputs: { mode: 'sync' } }) });
+    for (let i = 0; i < 20 && !run; i++) {
+      await sleep(3000);
+      run = ((await gh(wf + '&event=workflow_dispatch')).workflow_runs || []).find(r => Date.parse(r.created_at) >= t0 - 60e3);
+    }
+    if (!run) throw new Error('the sync run did not start');
+  }
+  store.set(SYNC_KEY, { t0, run: run.id, gen: D.generatedAt });
+  return followSync(run.id, t0, D.generatedAt);
+}
+async function followSync(id, t0, gen) {
+  let run;
+  for (;;) {
+    run = await gh(`/actions/runs/${id}`);
+    if (run.status === 'completed') break;
+    syncUI(run.status === 'in_progress' ? 'from brokers' : 'waiting to start');
+    if (Date.now() - t0 > SYNC_MAX) throw new Error('the sync run is taking too long; the page will show its data once it finishes');
+    await sleep(6000);
+  }
+  if (run.conclusion === 'cancelled' || run.conclusion === 'skipped') throw new Error(`the sync run was ${run.conclusion}`);
+  // the run publishes even when a broker failed (the page then shows what went wrong); GitHub Pages takes ~1 minute
+  syncUI('publishing');
+  for (let i = 0; i < 40; i++) {
+    try {
+      const txt = await (await fetch('pnl-data.js?t=' + Date.now(), { cache: 'no-store' })).text();
+      const g = (txt.match(/"generatedAt":"([^"]+)"/) || [])[1];
+      if (g && g !== gen) { store.set(SYNC_KEY, null); location.reload(); return; }
+    } catch { /* offline for a moment: try again */ }
+    await sleep(6000);
+  }
+  throw new Error('the run finished but the new page did not appear; tap Reload again in a minute');
+}
+async function sync(resume) {
+  if (syncing) return;
+  syncing = true; $('#reloadBtn').classList.add('spin');
+  try { resume ? await followSync(resume.run, resume.t0, resume.gen) : await startSync(); }
+  catch (e) { syncFailed(e.message || String(e)); }
+}
+$('#reloadBtn').onclick = () => {
+  if (!D.sync) { $('#reloadBtn').classList.add('spin'); location.reload(); return; }
+  sync();
+};
+$('#reloadBtn').title = D.sync ? 'Fetch the latest trades from all accounts' : 'Reload the latest data';
+setInterval(() => { if (!syncing) renderStatus(); }, 5 * 60e3);   // a page left open turns amber once a run is overdue
 renderStatus();
+// a sync started before the app was closed or reloaded: keep following it (unless this page already has its data)
+{ const p = store.get(SYNC_KEY, null);
+  if (p && D.sync && Date.now() - p.t0 < SYNC_MAX && p.gen === D.generatedAt) sync(p); else if (p) store.set(SYNC_KEY, null); }
 $('#sampleBadge').hidden = !D.sample;
 render();
 
