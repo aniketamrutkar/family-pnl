@@ -10,6 +10,8 @@ const TEXT = { html: 'text/html', htm: 'text/html', css: 'text/css', js: 'text/j
 const BINARY = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
   ico: 'image/x-icon', pdf: 'application/pdf', woff: 'font/woff', woff2: 'font/woff2', zip: 'application/zip',
   mp4: 'video/mp4' };
+// the installable-app files (manifest + icons) are public, not encrypted: Chrome reads them before any login
+const PLAIN = new Set(['manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']);
 const enc = new TextEncoder();
 let keys = null;
 
@@ -84,6 +86,6 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin || !url.pathname.startsWith(ROOT)) return;
   const rel = url.pathname.slice(ROOT.length);
-  if (rel === 'sw.js' || rel.startsWith('_enc/')) return;
+  if (rel === 'sw.js' || rel.startsWith('_enc/') || PLAIN.has(rel)) return;
   e.respondWith(serve(e.request, url));
 });
